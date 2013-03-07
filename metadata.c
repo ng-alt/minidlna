@@ -762,6 +762,7 @@ GetVideoMetadata(const char * path, char * name)
 	/* This must not be a video file. */
 	if( !vc )
 	{
+printf("not a video file\n");
 		lav_close(ctx);
 		if( !is_audio(path) )
 			DPRINTF(E_DEBUG, L_METADATA, "File %s does not contain a video stream.\n", basename(path));

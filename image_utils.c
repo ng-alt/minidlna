@@ -453,6 +453,11 @@ image_new_from_jpeg(const char * path, int is_file, const char * buf, int size, 
 		return NULL;
 	}
 	jpeg_read_header(&cinfo, TRUE);
+
+	/* added by Michael Jiang, for CTT 1.56 */
+	cinfo.scale_num   = 1;
+	/* ended by Michael Jiang, for CTT 1.56 */
+
 	cinfo.scale_denom = scale;
 	cinfo.do_fancy_upsampling = FALSE;
 	cinfo.do_block_smoothing = FALSE;

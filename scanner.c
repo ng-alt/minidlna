@@ -443,7 +443,8 @@ insert_directory(const char * name, const char * path, const char * base, const 
 		free(dir_buf);
 		return 0;
 	}
-
+	if(strcmp(path,"/tmp/shares/USB_Storage")==0)
+  strcpy(name,"Browse Folders");
 	detailID = GetFolderMetadata(name, path, NULL, NULL, find_album_art(path, NULL, 0));
 	sql_exec(db, "INSERT into OBJECTS"
 	             " (OBJECT_ID, PARENT_ID, REF_ID, DETAIL_ID, CLASS, NAME) "
@@ -713,6 +714,7 @@ filter_media(const struct dirent *d)
 	       ) ));
 }
 
+#define MAX_FILE_NUMBER 25000
 void
 ScanDirectory(const char * dir, const char * parent, enum media_types dir_type)
 {
@@ -721,13 +723,15 @@ ScanDirectory(const char * dir, const char * parent, enum media_types dir_type)
 	char parent_id[PATH_MAX];
 	char full_path[PATH_MAX];
 	char * name = NULL;
-	static long long unsigned int fileno = 0;
+	static unsigned int fileno = 0;
 	enum file_types type;
 
 	setlocale(LC_COLLATE, "");
 	if( chdir(dir) != 0 )
 		return;
 
+    if(fileno >= MAX_FILE_NUMBER) // stop scanner
+		return;
 	DPRINTF(parent?E_INFO:E_WARN, L_SCANNER, _("Scanning %s\n"), dir);
 	switch( dir_type )
 	{
@@ -786,8 +790,15 @@ ScanDirectory(const char * dir, const char * parent, enum media_types dir_type)
 		}
 		else if( type == TYPE_FILE && (access(full_path, R_OK) == 0) )
 		{
-			if( insert_file(name, full_path, (parent ? parent:""), i+startID) == 0 )
+			if( insert_file(name?name:namelist[i]->d_name, full_path, (parent ? parent:""), i+startID) == 0 )
+            {
 				fileno++;
+                if(fileno >= MAX_FILE_NUMBER){
+                    /*stop scanner*/
+                    n = 0;
+                }
+
+            }
 		}
 		free(name);
 		free(namelist[i]);
@@ -817,7 +828,8 @@ start_scanner()
 	if( flag )
 		fclose(flag);
 #endif
-	freopen("/dev/null", "a", stderr);
+//	freopen("/dev/null", "a", stderr);
+printf("minidlan :scan files\n");
 	while( media_path )
 	{
 		strncpy(name, media_path->path, sizeof(name));
