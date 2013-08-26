@@ -1470,7 +1470,6 @@ SendResp_albumArt(struct upnphttp * h, char * object)
 {
 	char header[512];
 	char *path;
-	char *dash;
 	char date[30];
 	time_t curtime = time(NULL);
 	off_t size;

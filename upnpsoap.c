@@ -481,6 +481,7 @@ mime_to_ext(const char * mime, char * buf)
 #define FILTER_UPNP_ORIGINALTRACKNUMBER          0x00080000
 #define FILTER_UPNP_SEARCHCLASS                  0x00100000
 #define FILTER_UPNP_STORAGEUSED                  0x00200000
+#define FILTER_SEARCHABLE                        0x00400000
 /* Vendor-specific filter flags */
 #define FILTER_SEC_CAPTION_INFO_EX               0x01000000
 #define FILTER_SEC_DCM_INFO                      0x02000000
@@ -509,6 +510,10 @@ set_filter_flags(char * filter, struct upnphttp *h)
 		if( strcmp(item, "@childCount") == 0 )
 		{
 			flags |= FILTER_CHILDCOUNT;
+		}
+		if( strcmp(item, "@searchable") == 0 )
+		{
+			flags |= FILTER_SEARCHABLE;
 		}
 		else if( strcmp(item, "dc:creator") == 0 )
 		{
@@ -1086,7 +1091,7 @@ callback(void *args, int argc, char **argv, char **azColName)
 				ret = strcatf(str, "&lt;upnp:album&gt;%s&lt;/upnp:album&gt;", "[No Keywords]");
 
 			/* EVA2000 doesn't seem to handle embedded thumbnails */
-			if( passed_args->client != ENetgearEVA2000 && tn && atoi(tn) ) {
+			if( !(passed_args->flags & FLAG_RESIZE_THUMBS) && tn && atoi(tn) ) {
 				ret = strcatf(str, "&lt;upnp:albumArtURI&gt;"
 				                   "http://%s:%d/Thumbnails/%s.jpg"
 			        	           "&lt;/upnp:albumArtURI&gt;",
@@ -1100,25 +1105,20 @@ callback(void *args, int argc, char **argv, char **azColName)
 		}
 		if( passed_args->filter & FILTER_RES ) {
 			mime_to_ext(mime, ext);
-			if( (passed_args->client == EFreeBox) && tn && atoi(tn) ) {
-				ret = strcatf(str, "&lt;res protocolInfo=\"http-get:*:%s:%s\"&gt;"
-				                   "http://%s:%d/Thumbnails/%s.jpg"
-				                   "&lt;/res&gt;",
-				                   mime, "DLNA.ORG_PN=JPEG_TN", lan_addr[passed_args->iface].str,
-				                   runtime_vars.port, detailID);
-			}
 			add_res(size, duration, bitrate, sampleFrequency, nrAudioChannels,
 			        resolution, dlna_buf, mime, detailID, ext, passed_args);
-			if( (*mime == 'i') && (passed_args->client != EFreeBox) ) {
-				int srcw = atoi(strsep(&resolution, "x"));
-				int srch = atoi(resolution);
-				if( !dlna_pn ) {
-					add_resized_res(srcw, srch, 4096, 4096, "JPEG_LRG", detailID, passed_args);
+			if( *mime == 'i' ) {
+				int srcw, srch;
+				if( resolution && (sscanf(resolution, "%dx%d", &srcw, &srch) == 2) )
+				{
+					if( srcw > 4096 || srch > 4096 )
+						add_resized_res(srcw, srch, 4096, 4096, "JPEG_LRG", detailID, passed_args);
+					if( srcw > 1024 || srch > 768 )
+						add_resized_res(srcw, srch, 1024, 768, "JPEG_MED", detailID, passed_args);
+					if( srcw > 640 || srch > 480 )
+						add_resized_res(srcw, srch, 640, 480, "JPEG_SM", detailID, passed_args);
 				}
-				if( !dlna_pn || !strncmp(dlna_pn, "JPEG_L", 6) || !strncmp(dlna_pn, "JPEG_M", 6) ) {
-					add_resized_res(srcw, srch, 640, 480, "JPEG_SM", detailID, passed_args);
-				}
-				if( tn && atoi(tn) ) {
+				if( !(passed_args->flags & FLAG_RESIZE_THUMBS) && tn && atoi(tn) ) {
 					ret = strcatf(str, "&lt;res protocolInfo=\"http-get:*:%s:%s\"&gt;"
 					                   "http://%s:%d/Thumbnails/%s.jpg"
 					                   "&lt;/res&gt;",
@@ -1126,6 +1126,8 @@ callback(void *args, int argc, char **argv, char **azColName)
 					                   mime, "DLNA.ORG_PN=JPEG_TN", lan_addr[passed_args->iface].str,
 					                   runtime_vars.port, detailID);
 				}
+				else
+					add_resized_res(srcw, srch, 160, 160, "JPEG_TN", detailID, passed_args);
 			}
 			else if( *mime == 'v' ) {
 				switch( passed_args->client ) {
@@ -1229,7 +1231,11 @@ callback(void *args, int argc, char **argv, char **azColName)
 	}
 	else if( strncmp(class, "container", 9) == 0 )
 	{
-		ret = strcatf(str, "&lt;container id=\"%s\" parentID=\"%s\" restricted=\"1\" ", id, parent);
+    if( passed_args->filter & FILTER_SEARCHABLE )
+		    ret = strcatf(str, "&lt;container id=\"%s\" parentID=\"%s\" restricted=\"1\" searchable=\"1\" ", id, parent);
+		else
+		    ret = strcatf(str, "&lt;container id=\"%s\" parentID=\"%s\" restricted=\"1\" ", id, parent);
+			
 		if( passed_args->filter & FILTER_CHILDCOUNT )
 		{
 			int children;
@@ -1433,7 +1439,6 @@ BrowseContentDirectory(struct upnphttp * h, const char * action)
 	{
 		ret = sql_get_int_field(db, "SELECT count(*) from OBJECTS where PARENT_ID = '%q'", ObjectID);
 		totalMatches = (ret > 0) ? ret : 0;
-
 		ret = 0;
 		if( SortCriteria )
 		{
@@ -1470,7 +1475,6 @@ BrowseContentDirectory(struct upnphttp * h, const char * action)
 			SoapError(h, 709, "Unsupported or invalid sort criteria");
 			goto browse_error;
 		}
-
 
 		sql = sqlite3_mprintf( SELECT_COLUMNS
 		                      "from OBJECTS o left join DETAILS d on (d.ID = o.DETAIL_ID)"
@@ -1657,8 +1661,6 @@ SearchContentDirectory(struct upnphttp * h, const char * action)
 	                                     "(select count(*) from OBJECTS o left join DETAILS d on (o.DETAIL_ID = d.ID)"
 	                                     " where (OBJECT_ID = '%q') and (%s))",
 	                                     ContainerID, SearchCriteria, ContainerID, SearchCriteria);
-
-
 	if( totalMatches < 0 )
 	{
 		/* Must be invalid SQL, so most likely bad or unhandled search criteria. */
@@ -1699,8 +1701,6 @@ SearchContentDirectory(struct upnphttp * h, const char * action)
 	                                      "from OBJECTS o left join DETAILS d on (d.ID = o.DETAIL_ID)"
 	                                      " where OBJECT_ID = '%q' and (%s) ", ContainerID, SearchCriteria),
 	                      orderBy, StartingIndex, RequestedCount);
-
-
 	DPRINTF(E_DEBUG, L_HTTP, "Search SQL: %s\n", sql);
 	ret = sqlite3_exec(db, sql, callback, (void *) &args, &zErrMsg);
 	if( (ret != SQLITE_OK) && (zErrMsg != NULL) )

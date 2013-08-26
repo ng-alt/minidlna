@@ -824,7 +824,7 @@ init(int argc, char * * argv)
 		strncpyt(presentationurl, presurl, PRESENTATIONURL_MAX_LEN);
 	else
 		strcpy(presentationurl, "/");
-
+printf("1\n");
 	/* set signal handler */
 	memset(&sa, 0, sizeof(struct sigaction));
 	sa.sa_handler = sigterm;
