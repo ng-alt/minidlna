@@ -1,10 +1,10 @@
-# $Id$
+# $Id: Makefile,v 1.24 2010/01/13 21:15:07 jmaggard Exp $
 # MiniDLNA project
 # http://sourceforge.net/projects/minidlna/
 # (c) 2008-2009 Justin Maggard
 # for use with GNU Make
 # To install use :
-# $ DESTDIR=/dummyinstalldir make install
+# $ PREFIX=/dummyinstalldir make install
 # or :
 # $ INSTALLPREFIX=/usr/local make install
 # or :
@@ -12,16 +12,38 @@
 #
 #CFLAGS = -Wall -O -D_GNU_SOURCE -g -DDEBUG
 #CFLAGS = -Wall -g -Os -D_GNU_SOURCE
-CFLAGS = -Wall -g -O3 -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64
-#STATIC_LINKING: CFLAGS += -DSTATIC
+CFLAGS = -Wall -g -O3 -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D__sparc__\
+         -I$(MINI_DLNA_PATH)/ffmpeg-0.5.1 \
+         -I$(MINI_DLNA_PATH)/ffmpeg-0.5.1/libavutil \
+     	 -I$(MINI_DLNA_PATH)/ffmpeg-0.5.1/libavcodec \
+     	 -I$(MINI_DLNA_PATH)/ffmpeg-0.5.1/libavformat \
+         -I$(MINI_DLNA_PATH)/sqlite-3.6.22 \
+         -I$(MINI_DLNA_PATH)/libexif-0.6.19 \
+         -I$(MINI_DLNA_PATH)/libid3tag-0.15.0b \
+         -I$(MINI_DLNA_PATH)/libogg-1.1.4/include/ \
+         -I$(MINI_DLNA_PATH)/libvorbis-1.2.3/include/ \
+     	 -I$(MINI_DLNA_PATH)/jpeg-7 \
+         -I$(MINI_DLNA_PATH)/flac-1.2.1/include/ \
+         -L$(MINI_DLNA_PATH)/lib/        
+          
+#	 -I/usr/include/ffmpeg \
+#	 -I/usr/include/libavutil -I/usr/include/libavcodec -I/usr/include/libavformat \
+#	 -I/usr/include/ffmpeg/libavutil -I/usr/include/ffmpeg/libavcodec -I/usr/include/ffmpeg/libavformat
 #STATIC_LINKING: LDFLAGS = -static
-CC = gcc
+
+CFLAGS += -I$(SRCBASE)/lib/include
+
+ifeq ($(PROFILE),WNDR4500REV)
+CFLAGS += -DWNDR4500REV 
+endif
+
+CC = $(CROSS_COMPILE)gcc
 RM = rm -f
 INSTALL = install
 
-INSTALLPREFIX ?= $(DESTDIR)/usr
+INSTALLPREFIX ?= $(PREFIX)/usr
 SBININSTALLDIR = $(INSTALLPREFIX)/sbin
-ETCINSTALLDIR = $(DESTDIR)/etc
+ETCINSTALLDIR = $(PREFIX)/etc
 
 BASEOBJS = minidlna.o upnphttp.o upnpdescgen.o upnpsoap.o \
            upnpreplyparse.o minixml.o \
@@ -34,14 +56,16 @@ BASEOBJS = minidlna.o upnphttp.o upnpdescgen.o upnpsoap.o \
 
 ALLOBJS = $(BASEOBJS) $(LNXOBJS)
 
-LIBS = -lpthread -lexif -ljpeg -lsqlite3 -lavformat -lavutil -lavcodec -lid3tag -lFLAC -logg -lvorbis
+#-lexif
+
+LIBS = -lpthread -lexif -ljpeg -lsqlite3 -lavformat -lid3tag -lFLAC -lvorbis -lavcodec -lavutil -logg -lz -lm -ldl
 #STATIC_LINKING: LIBS = -lvorbis -logg -lm -lsqlite3 -lpthread -lexif -ljpeg -lFLAC -lm -lid3tag -lz -lavformat -lavutil -lavcodec -lm
 
-TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
+#TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
 
-EXECUTABLES = minidlna testupnpdescgen
+EXECUTABLES = minidlna #testupnpdescgen
 
-.PHONY:	all clean distclean install depend
+.PHONY:	all clean install depend
 
 all:	$(EXECUTABLES)
 
@@ -50,32 +74,27 @@ clean:
 	$(RM) $(EXECUTABLES)
 	$(RM) testupnpdescgen.o
 
-distclean: clean
-	$(RM) config.h
-
 install:	minidlna
 	$(INSTALL) -d $(SBININSTALLDIR)
 	$(INSTALL) minidlna $(SBININSTALLDIR)
-
-install-conf:
 	$(INSTALL) -d $(ETCINSTALLDIR)
 	$(INSTALL) --mode=0644 minidlna.conf $(ETCINSTALLDIR)
 
-minidlna:	$(BASEOBJS) $(LNXOBJS) $(LIBS)
-	@echo Linking $@
-	@$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(BASEOBJS) $(LNXOBJS) $(LIBS)
+minidlna:	$(BASEOBJS) $(LNXOBJS)
+	#@echo Linking $@
+	$(CC) $(CFLAGS) -o $@ $(BASEOBJS) $(LNXOBJS) -Wl,--rpath -Wl,$(MINI_DLNA_PATH)/lib/ $(LIBS)
 
 
-testupnpdescgen:	$(TESTUPNPDESCGENOBJS)
-	@echo Linking $@
-	@$(CC) $(CFLAGS) -o $@ $(TESTUPNPDESCGENOBJS)
+#testupnpdescgen:	$(TESTUPNPDESCGENOBJS)
+#	@echo Linking $@
+#	@$(CC) $(CFLAGS) -o $@ $(TESTUPNPDESCGENOBJS)
 
-config.h:	genconfig.sh
-	./genconfig.sh
+#config.h:	genconfig.sh
+#	./genconfig.sh
 
-depend:	config.h
-	makedepend -f$(MAKEFILE_LIST) -Y \
-	$(ALLOBJS:.o=.c) $(TESTUPNPDESCGENOBJS:.o=.c) 2>/dev/null
+#depend:	config.h
+#	makedepend -f$(MAKEFILE_LIST) -Y \
+#	$(ALLOBJS:.o=.c) $(TESTUPNPDESCGENOBJS:.o=.c) 2>/dev/null
 
 # DO NOT DELETE
 
@@ -126,5 +145,7 @@ log.o: log.h
 
 .c.o:
 	@echo Compiling $*.c
-	@$(CC) $(CFLAGS) -o $@ -c $< && exit 0; \
-		echo "The following command failed:  $(CC) $(CFLAGS) -o $@ -c $<" && false
+	@$(CC) $(CFLAGS) -o $@ -c $< && exit 0;\
+		echo "The following command failed:" 1>&2;\
+		echo "$(CC) $(CFLAGS) -o $@ -c $<";\
+		$(CC) $(CFLAGS) -o $@ -c $< &>/dev/null

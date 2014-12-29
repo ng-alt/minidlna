@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU General Public License
  * along with MiniDLNA. If not, see <http://www.gnu.org/licenses/>.
  */
-#include "config.h"
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -31,7 +30,9 @@
 #include "image_utils.h"
 #include <jpeglib.h>
 #include <setjmp.h>
-#include "libav.h"
+#include <avutil.h>
+#include <avcodec.h>
+#include <avformat.h>
 #include "tagutils/tagutils.h"
 
 #include "upnpglobalvars.h"
@@ -761,6 +762,7 @@ GetVideoMetadata(const char * path, char * name)
 	/* This must not be a video file. */
 	if( !vc )
 	{
+printf("not a video file\n");
 		lav_close(ctx);
 		if( !is_audio(path) )
 			DPRINTF(E_DEBUG, L_METADATA, "File %s does not contain a video stream.\n", basename(path));
@@ -1023,11 +1025,8 @@ GetVideoMetadata(const char * path, char * name)
 						          vc->height * vc->sample_aspect_ratio.den,
 						          1024*1024);
 					}
-					if (ctx->streams[video_stream]->r_frame_rate.den)
-						fps = ctx->streams[video_stream]->r_frame_rate.num / ctx->streams[video_stream]->r_frame_rate.den;
-					else
-						fps = 0;
-					interlaced = vc->time_base.den ? (ctx->streams[video_stream]->r_frame_rate.num / vc->time_base.den) : 0;
+					fps = ctx->streams[video_stream]->r_frame_rate.num / ctx->streams[video_stream]->r_frame_rate.den;
+					interlaced = (ctx->streams[video_stream]->r_frame_rate.num / vc->time_base.den);
 					if( ((((vc->width == 1920 || vc->width == 1440) && vc->height == 1080) ||
 					      (vc->width == 720 && vc->height == 480)) && fps == 59 && interlaced) ||
 					    ((vc->width == 1280 && vc->height == 720) && fps == 59 && !interlaced) )

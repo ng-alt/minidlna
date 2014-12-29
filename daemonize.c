@@ -79,8 +79,10 @@ daemonize(void)
 		exit(0);
 	}
 #else
+/*
 	if( daemon(0, 0) < 0 )
 		perror("daemon()");
+*/
 	pid = getpid();
 #endif
 	return pid;

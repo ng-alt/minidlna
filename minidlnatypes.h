@@ -47,8 +47,8 @@ struct runtime_vars_s {
 
 struct string_s {
 	char *data; // ptr to start of memory area
-	size_t off;
-	size_t size;
+	int off;
+	int size;
 };
 
 enum media_types {
