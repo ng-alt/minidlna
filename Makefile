@@ -31,6 +31,8 @@ CFLAGS = -Wall -g -O3 -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 -D__sparc__\
 #	 -I/usr/include/ffmpeg/libavutil -I/usr/include/ffmpeg/libavcodec -I/usr/include/ffmpeg/libavformat
 #STATIC_LINKING: LDFLAGS = -static
 
+CFLAGS += -I$(SRCBASE)/lib/include
+
 ifeq ($(PROFILE),WNDR4500REV)
 CFLAGS += -DWNDR4500REV 
 endif

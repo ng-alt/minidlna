@@ -729,7 +729,7 @@ ScanDirectory(const char * dir, const char * parent, enum media_types dir_type)
 	enum file_types type;
 
     int k;
-    int adminflag=0;
+    int adminflag=0; //add by lawrence adminflag=1 the folder is admin. 
 
 	setlocale(LC_COLLATE, "");
 	if( chdir(dir) != 0 )
@@ -774,7 +774,11 @@ ScanDirectory(const char * dir, const char * parent, enum media_types dir_type)
 #endif
 		type = TYPE_UNKNOWN;
 		sprintf(full_path, "%s/%s", dir, namelist[i]->d_name);
+		
 		name = escape_tag(namelist[i]->d_name, 1);
+		
+		/*Foxconn add start by lawrence 2013/02/06 fixed all USB folder can acess*/
+		// if the folder is admin then set adminflag=1
 		for(k=0;k<(sizeof(adminfolder)/sizeof(adminfolder[0]));k++)
 		{
 		 if(adminfolder[k]!='\0')
@@ -797,6 +801,8 @@ ScanDirectory(const char * dir, const char * parent, enum media_types dir_type)
 		   adminflag=0;
 		   continue;
 		}
+		/*Foxconn add start by lawrence 2013/02/06 fixed all USB folder can acess*/
+		
 		if( namelist[i]->d_type == DT_DIR )
 		{
 			type = TYPE_DIR;
@@ -857,6 +863,8 @@ start_scanner()
 #endif
 //	freopen("/dev/null", "a", stderr);
 printf("minidlan :scan files\n");
+     
+
 	while( media_path )
 	{
 		strncpy(name, media_path->path, sizeof(name));

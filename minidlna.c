@@ -295,10 +295,10 @@ getfriendlyname(char * buf, int len)
 			logname = pwent->pw_name;
 	}
 #endif
-/* Modify start 02/17/2012 set the properly friendly name */
+/* Modify by Foxconn Antony start 02/17/2012 set the properly friendly name */
 //	snprintf(buf+off, len-off, "%s", logname?logname:"Unknown");
 	snprintf(buf+off, len-off, "%s", logname?logname:"ReadyShare");
-/* Modify end 02/17/2012 */
+/* Modify by Foxconn Antony end 02/17/2012 */
 #endif
 }
 

@@ -297,6 +297,7 @@ SendSSDPNotifies(int s, const char * host, unsigned short port,
 
   if(!is_disk_mounted())
       return;
+      
   #endif
 	memset(&sockname, 0, sizeof(struct sockaddr_in));
 	sockname.sin_family = AF_INET;
@@ -374,6 +375,8 @@ ParseUPnPClient(char *location)
 	enum client_types type = 0;
 	uint32_t flags = 0;
 	char *model, *serial, *name;
+
+
 
 	if (strncmp(location, "http://", 7) != 0)
 		return;
