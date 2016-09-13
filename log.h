@@ -49,7 +49,7 @@ extern void log_close(void);
 extern void log_err(int level, enum _log_facility facility, char *fname, int lineno, char *fmt, ...)
 	__attribute__((__format__ (__printf__, 5, 6)));
 
-#define DPRINTF(level, facility, fmt, arg...) do { log_err(level, facility, __FILE__, __LINE__, fmt, ##arg); } while (0)
-
+//#define DPRINTF(level, facility, fmt, arg...) do { log_err(level, facility, __FILE__, __LINE__, fmt, ##arg); } while (0)
+#define DPRINTF(level, facility, fmt, arg...) 
 
 #endif /* __ERR_H__ */

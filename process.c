@@ -163,8 +163,12 @@ process_daemonize(void)
 			exit(0);
 	}
 #else
+/* Foxconn modify start, Bernie 06/01/2016 */
+/*
 	if( daemon(0, 0) < 0 )
 		perror("daemon()");
+*/
+/* Foxconn modify end, Bernie 06/01/2016 */
 	pid = getpid();
 #endif
 	return pid;

@@ -460,6 +460,18 @@ image_new_from_jpeg(const char *path, int is_file, const uint8_t *buf, int size,
 	jpeg_start_decompress(&cinfo);
 	w = cinfo.output_width;
 	h = cinfo.output_height;
+/* Added by Foxconn Antony start 2016/08/10 Santiy check if the request memory is larger than we expected
+    Or this malloc will run out of usable memory */
+
+  if((w * h) >0x100000)
+  {
+		jpeg_destroy_decompress(&cinfo);
+		if( is_file )
+			fclose(file);
+		return NULL;
+  }
+/* Added by Foxconn Antony end 2016/08/10 */
+
 	vimage = (rotate & (ROTATE_90|ROTATE_270)) ? image_new(h, w) : image_new(w, h);
 	if(!vimage)
 	{

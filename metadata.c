@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU General Public License
  * along with MiniDLNA. If not, see <http://www.gnu.org/licenses/>.
  */
-#include "config.h"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -31,8 +30,12 @@
 #include <libexif/exif-loader.h>
 #include <jpeglib.h>
 #include <setjmp.h>
+/* Foxconn added start Bernie 06/01/2016 */
+#include "../ffmpeg-2.3.4/libavutil/avutil.h"
+#include "../ffmpeg-2.3.4/libavcodec/avcodec.h"
+#include "../ffmpeg-2.3.4/libavformat/avformat.h"
+/* Foxconn added end Bernie 06/01/2016 */
 #include "libav.h"
-
 #include "upnpglobalvars.h"
 #include "tagutils/tagutils.h"
 #include "image_utils.h"
@@ -714,6 +717,7 @@ GetVideoMetadata(const char *path, char *name)
 	basepath = basename(path_cpy);
 	if( !vc )
 	{
+printf("not a video file\n");	
 		/* This must not be a video file. */
 		lav_close(ctx);
 		if( !is_audio(path) )

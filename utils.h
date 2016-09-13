@@ -96,4 +96,7 @@ const char *mime_to_ext(const char * mime);
 int make_dir(char * path, mode_t mode);
 unsigned int DJBHash(uint8_t *data, int len);
 
+/* Foxconn modify start, Bernie 06/01/2016 */
+int is_disk_mounted();
+/* Foxconn modify end, Bernie 06/01/2016 */
 #endif
