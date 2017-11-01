@@ -269,7 +269,11 @@ SendSSDPNotifies(int s, const char *host, unsigned short port,
 	int l, n, dup, i=0;
 	unsigned int lifetime;
 	char bufr[512];
+  #if 1
 
+  if(!is_disk_mounted())
+      return;
+  #endif
 	memset(&sockname, 0, sizeof(struct sockaddr_in));
 	sockname.sin_family = AF_INET;
 	sockname.sin_port = htons(SSDP_PORT);
@@ -279,7 +283,7 @@ SendSSDPNotifies(int s, const char *host, unsigned short port,
 	for (dup = 0; dup < 2; dup++)
 	{
 		if (dup)
-			_usleep(200000);
+			sleep(1);
 		i = 0;
 		while (known_service_types[i])
 		{

@@ -238,7 +238,7 @@ getfriendlyname(char *buf, int len)
 		}
 	}
 	fclose(info);
-#if PNPX
+
 	memcpy(pnpx_hwid+4, "01F2", 4);
 	if (strcmp(modelnumber, "NVX") == 0)
 		memcpy(pnpx_hwid+17, "0101", 4);
@@ -261,7 +261,7 @@ getfriendlyname(char *buf, int len)
 		memcpy(pnpx_hwid+17, "0108", 4);
 	else if (strcmp(modelnumber, "NV+ v2") == 0)
 		memcpy(pnpx_hwid+17, "0109", 4);
-#endif
+
 #else
 	char * logname;
 	logname = getenv("LOGNAME");
@@ -274,7 +274,10 @@ getfriendlyname(char *buf, int len)
 			logname = pwent->pw_name;
 	}
 #endif
-	snprintf(buf+off, len-off, "%s", logname?logname:"Unknown");
+/* Modify by Foxconn Antony start 02/17/2012 set the properly friendly name */
+//	snprintf(buf+off, len-off, "%s", logname?logname:"Unknown");
+	snprintf(buf+off, len-off, "%s", logname?logname:"ReadyShare");
+/* Modify by Foxconn Antony end 02/17/2012 */
 #endif
 }
 
@@ -348,7 +351,9 @@ check_db(sqlite3 *db, int new_db, pid_t *scanner_pid)
 	}
 
 	ret = db_upgrade(db);
-	if (ret != 0)
+/* Foxconn modified start Bernie 06/01/2016 */	
+	if (1)
+/* Foxconn modifed end Bernie 06/01/2016 */	
 	{
 rescan:
 		if (ret < 0)
@@ -378,6 +383,7 @@ rescan:
 		{
 			start_scanner();
 			sqlite3_close(db);
+			printf("\n\n\n\n%d,minidlan:scan finished\n\n\n",__LINE__);	
 			log_close();
 			freeoptions();
 			free(children);
@@ -386,9 +392,11 @@ rescan:
 		else if (*scanner_pid < 0)
 		{
 			start_scanner();
+			printf("\n\n\n\n%d,minidlan:scan finished\n\n\n",__LINE__);	
 		}
 #else
 		start_scanner();
+		printf("\n\n\n\n%d,minidlan:scan finished\n\n\n",__LINE__);	
 #endif
 	}
 }
@@ -491,7 +499,7 @@ init(int argc, char **argv)
 	int debug_flag = 0;
 	int verbose_flag = 0;
 	int options_flag = 0;
-	struct sigaction sa;
+	struct sigaction sa,sa2;
 	const char * presurl = NULL;
 	const char * optionsfile = "/etc/minidlna.conf";
 	char mac_str[13];
@@ -500,6 +508,7 @@ init(int argc, char **argv)
 	char buf[PATH_MAX];
 	char log_str[75] = "general,artwork,database,inotify,scanner,metadata,http,ssdp,tivo=warn";
 	char *log_level = NULL;
+  sigset_t blockMask, emptyMask;	
 	struct media_dir_s *media_dir;
 	int ifaces = 0;
 	media_types types;
@@ -555,8 +564,6 @@ init(int argc, char **argv)
 						MAX_LAN_ADDR, word);
 					break;
 				}
-				while (isspace(*word))
-					word++;
 				runtime_vars.ifaces[ifaces++] = word;
 			}
 			break;
@@ -746,7 +753,7 @@ init(int argc, char **argv)
 	if (log_path[0] == '\0')
 	{
 		if (db_path[0] == '\0')
-			strncpyt(log_path, DEFAULT_LOG_PATH, PATH_MAX);
+			strncpyt(log_path, "/tmp/log", PATH_MAX);
 		else
 			strncpyt(log_path, db_path, PATH_MAX);
 	}
@@ -961,6 +968,14 @@ init(int argc, char **argv)
 		DPRINTF(E_FATAL, L_GENERAL, "Failed to set %s handler. EXITING.\n", "SIGINT");
 	if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)
 		DPRINTF(E_FATAL, L_GENERAL, "Failed to set %s handler. EXITING.\n", "SIGPIPE");
+
+  sigemptyset(&blockMask);
+  sigaddset(&blockMask, SIGCHLD);
+  if (sigprocmask(SIG_UNBLOCK, &blockMask, NULL) == -1)
+  {
+  	printf("failed to unlock SIGCHLD in minidna.exe\n");
+  }
+
 	if (signal(SIGHUP, &sighup) == SIG_ERR)
 		DPRINTF(E_FATAL, L_GENERAL, "Failed to set %s handler. EXITING.\n", "SIGHUP");
 	signal(SIGUSR1, &sigusr1);
@@ -1026,7 +1041,8 @@ main(int argc, char **argv)
 	ret = init(argc, argv);
 	if (ret != 0)
 		return 1;
-
+	
+	printf("\n%s,%d, Starting version 1.1.5\n",__FUNCTION__,__LINE__);
 	DPRINTF(E_WARN, L_GENERAL, "Starting " SERVER_NAME " version " MINIDLNA_VERSION ".\n");
 	if (sqlite3_libversion_number() < 3005001)
 	{
@@ -1254,31 +1270,36 @@ main(int argc, char **argv)
 			struct sockaddr_in clientname;
 			clientnamelen = sizeof(struct sockaddr_in);
 			shttp = accept(shttpl, (struct sockaddr *)&clientname, &clientnamelen);
-			if (shttp<0)
-			{
-				DPRINTF(E_ERROR, L_GENERAL, "accept(http): %s\n", strerror(errno));
-			}
+			if(!is_disk_mounted())
+			    close(shttp);
 			else
 			{
-				struct upnphttp * tmp = 0;
-				DPRINTF(E_DEBUG, L_GENERAL, "HTTP connection from %s:%d\n",
-					inet_ntoa(clientname.sin_addr),
-					ntohs(clientname.sin_port) );
-				/*if (fcntl(shttp, F_SETFL, O_NONBLOCK) < 0) {
-					DPRINTF(E_ERROR, L_GENERAL, "fcntl F_SETFL, O_NONBLOCK\n");
-				}*/
-				/* Create a new upnphttp object and add it to
-				 * the active upnphttp object list */
-				tmp = New_upnphttp(shttp);
-				if (tmp)
+				if (shttp<0)
 				{
-					tmp->clientaddr = clientname.sin_addr;
-					LIST_INSERT_HEAD(&upnphttphead, tmp, entries);
+					DPRINTF(E_ERROR, L_GENERAL, "accept(http): %s\n", strerror(errno));
 				}
 				else
 				{
-					DPRINTF(E_ERROR, L_GENERAL, "New_upnphttp() failed\n");
-					close(shttp);
+					struct upnphttp * tmp = 0;
+					DPRINTF(E_DEBUG, L_GENERAL, "HTTP connection from %s:%d\n",
+						inet_ntoa(clientname.sin_addr),
+						ntohs(clientname.sin_port) );
+					/*if (fcntl(shttp, F_SETFL, O_NONBLOCK) < 0) {
+						DPRINTF(E_ERROR, L_GENERAL, "fcntl F_SETFL, O_NONBLOCK\n");
+					}*/
+					/* Create a new upnphttp object and add it to
+					 * the active upnphttp object list */
+					tmp = New_upnphttp(shttp);
+					if (tmp)
+					{
+						tmp->clientaddr = clientname.sin_addr;
+						LIST_INSERT_HEAD(&upnphttphead, tmp, entries);
+					}
+					else
+					{
+						DPRINTF(E_ERROR, L_GENERAL, "New_upnphttp() failed\n");
+						close(shttp);
+					}
 				}
 			}
 		}

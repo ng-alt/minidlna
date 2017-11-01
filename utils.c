@@ -386,6 +386,7 @@ is_video(const char * file)
 #ifdef TIVO_SUPPORT
 		ends_with(file, ".TiVo") ||
 #endif
+        ends_with(file, ".m2v") ||     /* Foxconn add by Hank to support .m2v, 2012/04/12 */
 		ends_with(file, ".mov") || ends_with(file, ".3gp"));
 }
 
@@ -465,6 +466,10 @@ resolve_unknown_type(const char * path, media_types dir_type)
 				}
 			}
 			stat(path, &entry);
+/* Foxconn modify start, Bernie 06/01/2016 */			
+			type = TYPE_LINK;
+			return type;
+/* Foxconn modify end, Bernie 06/01/2016 */			
 		}
 
 		if( S_ISDIR(entry.st_mode) )
@@ -503,3 +508,29 @@ resolve_unknown_type(const char * path, media_types dir_type)
 	return type;
 }
 
+#if 1
+int is_disk_mounted()
+{
+  FILE *fp;
+  char buffer[128];
+  /* see if there is any pen drive mount */
+  system("df > /tmp/df");
+  fp=fopen("/tmp/df","r");
+  
+  if(fp)
+  {
+      while(!feof(fp))
+      {
+          fgets(buffer,128,fp);
+          if(strncmp("/dev/sd",buffer,strlen("/dev/sd"))==0)
+          {
+              fclose(fp);
+              return 1;
+          }
+      }
+      fclose(fp);
+  }
+  return 0;
+  
+}
+#endif

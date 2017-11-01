@@ -38,6 +38,8 @@
 struct option * ary_options = NULL;
 int num_options = 0;
 
+char *adminfolder[256]; //add by lawrence save USB admin floder name ps:max folder number is 255
+
 static const struct {
 	enum upnpconfigoptions id;
 	const char * name;
@@ -62,6 +64,7 @@ static const struct {
 	{ ENABLE_DLNA_STRICT, "strict_dlna" },
 	{ ROOT_CONTAINER, "root_container" },
 	{ USER_ACCOUNT, "user" },
+	{ UPNPMEDIADIRADMIN, "media_dir_admin" }, /*add by lawrence save admin folder  */
 	{ FORCE_SORT_CRITERIA, "force_sort_criteria" },
 	{ MAX_CONNECTIONS, "max_connections" },
 	{ MERGE_MEDIA_DIRS, "merge_media_dirs" }
@@ -80,6 +83,9 @@ readoptionsfile(const char * fname)
 	int i;
 	enum upnpconfigoptions id;
 
+
+    int j;
+   
 	if(!fname || *fname == '\0')
 		return -1;
 
@@ -92,6 +98,14 @@ readoptionsfile(const char * fname)
 	if(!(hfile = fopen(fname, "r")))
 		return -1;
 
+
+	/*Foxconn add start by lawrence 2013/02/06 fixed all USB folder can acess*/
+    //Setting empty of adminfolder array
+    for(j=0;j<(sizeof(adminfolder)/sizeof(adminfolder[0]));j++)
+	  adminfolder[j]='\0';
+    j=0;
+	/*Foxconn add start by lawrence 2013/02/06 fixed all USB folder can acess*/
+	
 	while(fgets(buffer, sizeof(buffer), hfile))
 	{
 		linenum++;
@@ -171,7 +185,17 @@ readoptionsfile(const char * fname)
 			ary_options[num_options-1].id = id;
 			strncpyt(ary_options[num_options-1].value, value, MAX_OPTION_VALUE_LEN);
 		}
-
+       
+		/*Foxconn add start by lawrence 2013/02/06 fixed all folder can acess*/
+		//save the admin folder to adminfolder 
+		if(strcmp(name,"media_dir_admin")==0)
+		{
+		   adminfolder[j]=ary_options[num_options-1].value;
+		   j++;
+		}
+		/*Foxconn add start by lawrence 2013/02/06 fixed all folder can acess*/
+		
+		
 	}
 	
 	fclose(hfile);

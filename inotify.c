@@ -31,13 +31,12 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <poll.h>
-#ifdef HAVE_SYS_INOTIFY_H
 #include <sys/inotify.h>
-#else
-#include "linux/inotify.h"
-#include "linux/inotify-syscalls.h"
-#endif
-#include "libav.h"
+/* Foxconn added start Bernie 06/01/2016 */
+#include "../ffmpeg-2.3.4/libavutil/avutil.h"
+#include "../ffmpeg-2.3.4/libavcodec/avcodec.h"
+#include "../ffmpeg-2.3.4/libavformat/avformat.h"
+/* Foxconn added end Bernie 06/01/2016 */
 
 #include "upnpglobalvars.h"
 #include "inotify.h"
@@ -650,8 +649,11 @@ start_inotify()
 	int length, i = 0;
 	char * esc_name = NULL;
 	struct stat st;
-        
-	pollfds[0].fd = inotify_init();
+ 
+/* Foxconn modify start, Bernie 06/01/2016 */       
+//	pollfds[0].fd = inotify_init();
+	pollfds[0].fd = inotify_init1(IN_CLOEXEC);
+/* Foxconn modify end, Bernie 06/01/2016 */		
 	pollfds[0].events = POLLIN;
 
 	if ( pollfds[0].fd < 0 )
@@ -716,10 +718,15 @@ start_inotify()
 				else if ( (event->mask & (IN_CLOSE_WRITE|IN_MOVED_TO|IN_CREATE)) &&
 				          (lstat(path_buf, &st) == 0) )
 				{
-					if( (event->mask & (IN_MOVED_TO|IN_CREATE)) && (S_ISLNK(st.st_mode) || st.st_nlink > 1) )
+/* Foxconn modify start, Bernie 06/06/2016 @ The original code can not establish a hidden directory.*/
+//					if( (event->mask & (IN_MOVED_TO|IN_CREATE)) && (S_ISLNK(st.st_mode) || st.st_nlink > 1) )
+//					{
+//						DPRINTF(E_DEBUG, L_INOTIFY, "The %s link %s was %s.\n",
+//							(S_ISLNK(st.st_mode) ? "symbolic" : "hard"),				
+					if( S_ISLNK(st.st_mode) )
 					{
-						DPRINTF(E_DEBUG, L_INOTIFY, "The %s link %s was %s.\n",
-							(S_ISLNK(st.st_mode) ? "symbolic" : "hard"),
+						DPRINTF(E_DEBUG, L_INOTIFY, "The symbolic link %s was %s.\n",
+/* Foxconn modify start, Bernie 06/06/2016 */						
 							path_buf, (event->mask & IN_MOVED_TO ? "moved here" : "created"));
 						if( stat(path_buf, &st) == 0 && S_ISDIR(st.st_mode) )
 							inotify_insert_directory(pollfds[0].fd, esc_name, path_buf);

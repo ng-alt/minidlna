@@ -88,6 +88,10 @@ getifaddr(const char *ifname)
 		addr_in = (struct sockaddr_in *)p->ifa_addr;
 		if (!ifname && (p->ifa_flags & (IFF_LOOPBACK | IFF_SLAVE)))
 			continue;
+			/* Foxconn added start Bernie 06/01/2016 */
+			if (strcmp(p->ifa_name, "br0") != 0)
+				continue;
+			/* Foxconn added end Bernie 06/01/2016 */				
 		memcpy(&lan_addr[n_lan_addr].addr, &addr_in->sin_addr, sizeof(lan_addr[n_lan_addr].addr));
 		if (!inet_ntop(AF_INET, &addr_in->sin_addr, lan_addr[n_lan_addr].str, sizeof(lan_addr[0].str)) )
 		{
@@ -133,6 +137,8 @@ getifaddr(const char *ifname)
 	{
 		ifr = &ifc.ifc_req[i];
 		if (ifname && strcmp(ifr->ifr_name, ifname) != 0)
+			continue;		
+		if(strcmp(ifr->ifr_name,"br0")!=0)
 			continue;
 		if (!ifname &&
 		    (ioctl(s, SIOCGIFFLAGS, ifr) < 0 || ifr->ifr_ifru.ifru_flags & IFF_LOOPBACK))
@@ -197,6 +203,12 @@ getsyshwaddr(char *buf, int len)
 			fd = socket(AF_INET, SOCK_DGRAM, 0);
 			if (fd < 0)
 				continue;
+			/* Foxconn added start Bernie 06/01/2016 */
+			/* DLNA should only work on br0 interface...*/
+			if (strcmp(p->ifa_name, "br0") != 0)
+				continue;
+			/* Foxconn added end Bernie 06/01/2016 */
+				
 			strncpy(ifr.ifr_name, p->ifa_name, IFNAMSIZ);
 			ret = ioctl(fd, SIOCGIFHWADDR, &ifr);
 			close(fd);
@@ -235,6 +247,12 @@ getsyshwaddr(char *buf, int len)
 
 	for (if_idx = ifaces; if_idx->if_index; if_idx++)
 	{
+		/* Foxconn added start pling 09/30/2013 */
+		/* DLNA should only work on br0 interface...*/
+		if (strcmp(if_idx->if_name, "br0") != 0)
+			continue;
+		/* Foxconn added end pling 09/30/2013 */
+	
 		strncpyt(ifr.ifr_name, if_idx->if_name, IFNAMSIZ);
 		if (ioctl(fd, SIOCGIFFLAGS, &ifr) < 0)
 			continue;
