@@ -1927,9 +1927,14 @@ SamsungSetBookmark(struct upnphttp * h, const char * action)
 	if( ObjectID && PosSecond )
 	{
 		int ret;
+/* PSV-2017-3056 Fix: Unauthenticated UPNP/SOAP Request to minidlnad */
+		int sec = atoi(PosSecond);
+		if (sec < 30)
+			sec = 0;
 		ret = sql_exec(db, "INSERT OR REPLACE into BOOKMARKS"
 		                   " VALUES "
-		                   "((select DETAIL_ID from OBJECTS where OBJECT_ID = '%q'), %q)", ObjectID, PosSecond);
+		                   "((select DETAIL_ID from OBJECTS where OBJECT_ID = '%q'), %d)", ObjectID, sec);
+/* PSV-2017-3056 Fix: Unauthenticated UPNP/SOAP Request to minidlnad */
 		if( ret != SQLITE_OK )
 			DPRINTF(E_WARN, L_METADATA, "Error setting bookmark %s on ObjectID='%s'\n", PosSecond, ObjectID);
 		BuildSendAndCloseSoapResp(h, resp, sizeof(resp)-1);
