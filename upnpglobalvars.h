@@ -165,7 +165,8 @@
 	"http-get:*:audio/mp4:*," \
 	"http-get:*:audio/x-wav:*," \
 	"http-get:*:audio/x-flac:*," \
-	"http-get:*:application/ogg:*"
+	"http-get:*:application/ogg:*" \
+	"http-get:*:video/x-pn-realvideo:*"
 
 #define DLNA_FLAG_DLNA_V1_5      0x00100000
 #define DLNA_FLAG_HTTP_STALLING  0x00200000
@@ -210,7 +211,7 @@ extern char modelname[];
 #define MODELNUMBER_MAX_LEN 16
 extern char modelnumber[];
 
-#define SERIALNUMBER_MAX_LEN 16
+#define SERIALNUMBER_MAX_LEN 18
 extern char serialnumber[];
 
 #define PRESENTATIONURL_MAX_LEN 64
@@ -234,5 +235,8 @@ extern struct album_art_name_s *album_art_names;
 extern volatile short int quitting;
 extern volatile uint32_t updateID;
 extern const char *force_sort_criteria;
+#if 0
+extern int web_status;
+#endif
 
 #endif

@@ -65,6 +65,9 @@
 #include "minissdp.h"
 #include "utils.h"
 #include "log.h"
+#ifdef BCMARM
+#include "ifaddrs.c"
+#endif
 
 static int
 getifaddr(const char *ifname)

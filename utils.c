@@ -26,6 +26,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/sysinfo.h>
 #include <limits.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -375,6 +376,8 @@ mime_to_ext(const char * mime)
 				return "3gp";
 			else if( strncmp(mime+6, "x-tivo-mpeg", 11) == 0 )
 				return "TiVo";
+			else if( strncmp(mime+6, "x-pn-realvideo", 11) == 0 )
+				return "rmvb";
 			break;
 		case 'i':
 			if( strcmp(mime+6, "jpeg") == 0 )
@@ -398,6 +401,8 @@ is_video(const char * file)
 		ends_with(file, ".mts") || ends_with(file, ".m2ts")  ||
 		ends_with(file, ".m2t") || ends_with(file, ".mkv")   ||
 		ends_with(file, ".vob") || ends_with(file, ".ts")    ||
+		ends_with(file, ".tp")  ||
+		ends_with(file, ".rmvb")|| ends_with(file, ".rm")    ||
 		ends_with(file, ".flv") || ends_with(file, ".xvid")  ||
 #ifdef TIVO_SUPPORT
 		ends_with(file, ".TiVo") ||
@@ -530,4 +535,12 @@ valid_media_types(const char *path)
 	}
 
 	return ALL_MEDIA;
+}
+
+long uptime(void)
+{
+	struct sysinfo info;
+	sysinfo(&info);
+
+	return info.uptime;
 }

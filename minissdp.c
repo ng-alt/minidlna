@@ -143,7 +143,9 @@ OpenAndConfSSDPNotifySocket(struct lan_addr_s *iface)
 {
 	int s;
 	unsigned char loopchar = 0;
-	uint8_t ttl = 4;
+	uint8_t ttl = 2; /* UDA v1.1 says :
+			  * The TTL for the IP packet SHOULD default to 2 and
+			  * SHOULD be configurable. */
 	struct in_addr mc_if;
 	struct sockaddr_in sockname;
 	
@@ -222,7 +224,7 @@ SendSSDPResponse(int s, struct sockaddr_in sockname, int st_no,
 	int l, n;
 	char buf[512];
 	char tmstr[30];
-	time_t tm = time(NULL);
+	time_t tm = uptime();
 
 	/*
 	 * follow guideline from document "UPnP Device Architecture 1.0"
@@ -474,7 +476,7 @@ close:
 	else
 	{
 		client->type = &client_types[type];
-		client->age = time(NULL);
+		client->age = uptime();
 	}
 }
 
@@ -579,7 +581,7 @@ ProcessSSDPRequest(int s, unsigned short port)
 				if (client->type->type < EStandardDLNA150 &&
 				    client->type->type != ESamsungSeriesA)
 				{
-					client->age = time(NULL);
+					client->age = uptime();
 					return;
 				}
 			}

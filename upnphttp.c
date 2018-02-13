@@ -81,13 +81,20 @@
 #include "clients.h"
 #include "process.h"
 #include "sendfile.h"
+#if defined MS_IPK || defined MS_LIMIT
+#include "metadata.h"
+#endif
 
 #define MAX_BUFFER_SIZE 2147483647
 #define MIN_BUFFER_SIZE 65536
 
 #define INIT_STR(s, d) { s.data = d; s.size = sizeof(d); s.off = 0; }
 
+#ifdef MS_IPK
+#include "icons_ipk.c"
+#else
 #include "icons.c"
+#endif
 
 enum event_type {
 	E_INVALID,
@@ -115,6 +122,116 @@ New_upnphttp(int s)
 	ret->socket = s;
 	return ret;
 }
+
+#ifdef MS_IPK
+int getmodel()
+{
+    FILE *fp;
+    int model = 0;//if RT-N56U or RT-N65U is 1; if DSL-N55U is 0;
+    char *p = NULL,*pp = NULL;
+    char *q ,*qq ,*qqq ;
+    char a[100];
+    memset(a,'\0',sizeof(a));
+    fp = fopen("/opt/etc/mes_general.conf","r");
+    if(fp)
+    {
+        while(!feof(fp))
+        {
+            fscanf(fp,"%[^\n]%*c",a);
+            DPRINTF(E_DEBUG, L_HTTP, "upnphttp--getmodel--a=%s\n", a);
+
+            //model=1
+            p = strstr(a,"PRODUCTID=RT-N56");
+            pp = strstr(a,"PRODUCTID=RT-N65");
+            if(p || pp)
+            {
+                model = 1;
+                break;
+            }
+            //model=0
+            q = NULL;
+            qq = NULL;
+            q = strstr(a,"PRODUCTID=DSL-N55");
+            qq = strstr(a,"PRODUCTID=DSL-N16U");
+            if(q ||qq )
+            {
+                model = 0;
+                break;
+            }
+            //model=2
+            q = NULL;
+            qq = NULL;
+            q = strstr(a,"PRODUCTID=RT-N14");
+            qq = strstr(a,"PRODUCTID=RT-AC52U");
+            if(q || qq)
+            {
+                model = 2;
+                break;
+            }
+            //model=3
+            q = NULL;
+            q = strstr(a,"PRODUCTID=RT-AC51U");
+            if(q)
+            {
+                model = 3;
+                break;
+            }
+            //model=4
+            q = NULL;
+            q = strstr(a,"PRODUCTID=DSL-N66U");
+            if(q)
+            {
+                model = 4;
+                break;
+            }
+            //model=5
+            q = NULL;
+            qq = NULL;
+            q = strstr(a,"PRODUCTID=RT-AC1200");
+            qq= strstr(a, "PRODUCTID=DSL-AC52U");
+            if(q || qq)
+            {
+                model = 5;
+                break;
+            }
+            //model=6
+            q = NULL;
+            qq = NULL;
+            qqq = NULL;
+            q = strstr(a,"PRODUCTID=RT-AC56U");
+            qq= strstr(a,"PRODUCTID=DSL-N17U");
+            qqq= strstr(a,"PRODUCTID=DSL-AC56U");
+            if(q || qq || qqq)
+            {
+                model = 6;
+                break;
+            }
+            //model=7
+            q = NULL;
+            qq = NULL;
+            q = strstr(a,"PRODUCTID=DSL-N14U");
+            qq= strstr(a,"PRODUCTID=DSL-N12U_C1");
+            if(q || qq)
+            {
+                model = 7;
+                break;
+            }
+            //model=8
+            q = NULL;
+            q = strstr(a,"PRODUCTID=CM-32_AC2600");
+            if(q)
+            {
+                model = 8;
+                break;
+            }
+        }
+    }
+    fclose(fp);
+    //DPRINTF(E_WARN, L_SCANNER, _("model is %d !\n"),model);
+
+    return model;
+}
+#endif
 
 void
 CloseSocket_upnphttp(struct upnphttp * h)
@@ -458,7 +575,7 @@ next_header:
 		    (ctype == ESamsungSeriesB && type == ESamsungSeriesA))
 			return;
 		h->req_client->type = &client_types[client];
-		h->req_client->age = time(NULL);
+		h->req_client->age = uptime();
 	}
 }
 
@@ -603,6 +720,7 @@ SendResp_readynas_admin(struct upnphttp * h)
 }
 #endif
 
+#if 0
 static void
 SendResp_presentation(struct upnphttp * h)
 {
@@ -649,13 +767,14 @@ SendResp_presentation(struct upnphttp * h)
 	}
 	strcatf(&str, "</table>");
 
-	strcatf(&str, "<br>%d connection%s currently open<br>", number_of_children, (number_of_children == 1 ? "" : "s"));
+	strcatf(&str, "<br>%d connection%s currently open<br>", (number_of_children > 0 ? number_of_children : 0), (number_of_children == 1 ? "" : "s"));
 	strcatf(&str, "</BODY></HTML>\r\n");
 
 	BuildResp_upnphttp(h, str.data, str.off);
 	SendResp_upnphttp(h);
 	CloseSocket_upnphttp(h);
 }
+#endif
 
 /* ProcessHTTPPOST_upnphttp()
  * executes the SOAP query if it is possible */
@@ -1004,8 +1123,10 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 		{
 			SendResp_caption(h, HttpUrl+10);
 		}
+#if 0
 		else if(strncmp(HttpUrl, "/status", 7) == 0)
 		{
+			if (web_status)
 			SendResp_presentation(h);
 		}
 		else if(strcmp(HttpUrl, "/") == 0)
@@ -1013,9 +1134,11 @@ ProcessHttpQuery_upnphttp(struct upnphttp * h)
 			#ifdef READYNAS
 			SendResp_readynas_admin(h);
 			#else
+			if (web_status)
 			SendResp_presentation(h);
 			#endif
 		}
+#endif
 		else
 		{
 			DPRINTF(E_WARN, L_HTTP, "%s not found, responding ERROR 404\n", HttpUrl);
@@ -1154,7 +1277,7 @@ BuildHeader_upnphttp(struct upnphttp * h, int respcode,
 		"Connection: close\r\n"
 		"Content-Length: %d\r\n"
 		"Server: " MINIDLNA_SERVER_STRING "\r\n";
-	time_t curtime = time(NULL);
+	time_t curtime = uptime();
 	char date[30];
 	int templen;
 	struct string_s res;
@@ -1324,7 +1447,7 @@ start_dlna_header(struct string_s *str, int respcode, const char *tmode, const c
 	char date[30];
 	time_t now;
 
-	now = time(NULL);
+	now = uptime();
 	strftime(date, sizeof(date),"%a, %d %b %Y %H:%M:%S GMT" , gmtime(&now));
 	strcatf(str, "HTTP/1.1 %d OK\r\n"
 	             "Connection: close\r\n"
@@ -1377,6 +1500,386 @@ _open_file(const char *orig_path)
 	return fd;
 }
 
+#ifdef MS_IPK
+static void
+SendResp_icon(struct upnphttp * h, char * icon)
+{
+    //DPRINTF(E_WARN, L_HTTP,"SendResp_icon\n" );
+    char header[512];
+    char mime[12] = "image/";
+    char *data=NULL;
+    int size=0;
+    struct string_s str;
+    int model = getmodel();
+    //DPRINTF(E_WARN, L_HTTP, "model=%d",model);
+    if(model == 1)//RT-N56U and RT-N65U
+    {
+        DPRINTF(E_WARN, L_SCANNER, _("RT-N65U or RT-N56U\n"));
+        if( strcmp(icon, "sm.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small PNG icon\n");
+            data = (char *)png_sm;
+            size = sizeof(png_sm)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "lrg.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large PNG icon\n");
+            data = (char *)png_lrg;
+            size = sizeof(png_lrg)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "sm.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small JPEG icon\n");
+            data = (char *)jpeg_sm;
+            size = sizeof(jpeg_sm)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else if( strcmp(icon, "lrg.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large JPEG icon\n");
+            data = (char *)jpeg_lrg;
+            size = sizeof(jpeg_lrg)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else
+        {
+            DPRINTF(E_WARN, L_HTTP, "Invalid icon request: %s\n", icon);
+            Send404(h);
+            return;
+        }
+    }
+    else if(model == 2)//RT-N14U
+    {
+        DPRINTF(E_WARN, L_SCANNER, _("RT-N14U or RT-AC52U\n"));
+        if( strcmp(icon, "sm.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small PNG icon\n");
+            data = (char *)png_sm2;
+            size = sizeof(png_sm2)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "lrg.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large PNG icon\n");
+            data = (char *)png_lrg2;
+            size = sizeof(png_lrg2)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "sm.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small JPEG icon\n");
+            data = (char *)jpeg_sm2;
+            size = sizeof(jpeg_sm2)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else if( strcmp(icon, "lrg.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large JPEG icon\n");
+            data = (char *)jpeg_lrg2;
+            size = sizeof(jpeg_lrg2)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else
+        {
+            DPRINTF(E_WARN, L_HTTP, "Invalid icon request: %s\n", icon);
+            Send404(h);
+            return;
+        }
+    }
+    else if(model == 0)//DSL-N55U,DSL-N55U_C1,DSL_N55U_D1,DSL_N16U
+    {
+        DPRINTF(E_WARN, L_SCANNER, _("DSL-N55U or DSL-N55U_C1 or DSL_N55U_D1 or DSL_N16U\n"));
+        if( strcmp(icon, "sm.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small PNG icon\n");
+            data = (char *)png_sm1;
+            size = sizeof(png_sm1)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "lrg.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large PNG icon\n");
+            data = (char *)png_lrg1;
+            size = sizeof(png_lrg1)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "sm.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small JPEG icon\n");
+            data = (char *)jpeg_sm1;
+            size = sizeof(jpeg_sm1)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else if( strcmp(icon, "lrg.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large JPEG icon\n");
+            data = (char *)jpeg_lrg1;
+            size = sizeof(jpeg_lrg1)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else
+        {
+            DPRINTF(E_WARN, L_HTTP, "Invalid icon request: %s\n", icon);
+            Send404(h);
+            return;
+        }
+    }
+    else if(model == 3)//RT-N51U
+    {
+        DPRINTF(E_WARN, L_SCANNER, _("RT-N51U\n"));
+        if( strcmp(icon, "sm.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small PNG icon\n");
+            data = (char *)png_sm3;
+            size = sizeof(png_sm3)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "lrg.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large PNG icon\n");
+            data = (char *)png_lrg3;
+            size = sizeof(png_lrg3)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "sm.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small JPEG icon\n");
+            data = (char *)jpeg_sm3;
+            size = sizeof(jpeg_sm3)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else if( strcmp(icon, "lrg.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large JPEG icon\n");
+            data = (char *)jpeg_lrg3;
+            size = sizeof(jpeg_lrg3)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else
+        {
+            DPRINTF(E_WARN, L_HTTP, "Invalid icon request: %s\n", icon);
+            Send404(h);
+            return;
+        }
+    }
+    else if(model == 4)//DSL-N66U
+    {
+        DPRINTF(E_WARN, L_SCANNER, _("DSL-N66U\n"));
+        if( strcmp(icon, "sm.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small PNG icon\n");
+            data = (char *)png_sm4;
+            size = sizeof(png_sm4)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "lrg.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large PNG icon\n");
+            data = (char *)png_lrg4;
+            size = sizeof(png_lrg4)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "sm.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small JPEG icon\n");
+            data = (char *)jpeg_sm4;
+            size = sizeof(jpeg_sm4)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else if( strcmp(icon, "lrg.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large JPEG icon\n");
+            data = (char *)jpeg_lrg4;
+            size = sizeof(jpeg_lrg4)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else
+        {
+            DPRINTF(E_WARN, L_HTTP, "Invalid icon request: %s\n", icon);
+            Send404(h);
+            return;
+        }
+    }
+    else if(model == 5)//RT-AC1200 DSL-AC52U
+    {
+        DPRINTF(E_WARN, L_SCANNER, _("RT-AC1200 or DSL-AC52U\n"));
+        if( strcmp(icon, "sm.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small PNG icon\n");
+            data = (char *)png_sm5;
+            size = sizeof(png_sm5)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "lrg.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large PNG icon\n");
+            data = (char *)png_lrg5;
+            size = sizeof(png_lrg5)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "sm.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small JPEG icon\n");
+            data = (char *)jpeg_sm5;
+            size = sizeof(jpeg_sm5)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else if( strcmp(icon, "lrg.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large JPEG icon\n");
+            data = (char *)jpeg_lrg5;
+            size = sizeof(jpeg_lrg5)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else
+        {
+            DPRINTF(E_WARN, L_HTTP, "Invalid icon request: %s\n", icon);
+            Send404(h);
+            return;
+        }
+    }
+    else if(model == 6)//DSL-N17U,DSL-AC56U,RT-AC56U
+    {
+        DPRINTF(E_WARN, L_SCANNER, _("DSL-N17U or DSL-AC56U or RT-AC56U\n"));
+        if( strcmp(icon, "sm.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small PNG icon\n");
+            data = (char *)png_sm6;
+            size = sizeof(png_sm6)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "lrg.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large PNG icon\n");
+            data = (char *)png_lrg6;
+            size = sizeof(png_lrg6)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "sm.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small JPEG icon\n");
+            data = (char *)jpeg_sm6;
+            size = sizeof(jpeg_sm6)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else if( strcmp(icon, "lrg.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large JPEG icon\n");
+            data = (char *)jpeg_lrg6;
+            size = sizeof(jpeg_lrg6)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else
+        {
+            DPRINTF(E_WARN, L_HTTP, "Invalid icon request: %s\n", icon);
+            Send404(h);
+            return;
+        }
+    }
+    else if(model == 7)//DSL-N14U,DSL-N12U_C1
+    {
+        DPRINTF(E_WARN, L_SCANNER, _("DSL-N14U or DSL-N12U_C1\n"));
+        if( strcmp(icon, "sm.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small PNG icon\n");
+            data = (char *)png_sm7;
+            size = sizeof(png_sm7)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "lrg.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large PNG icon\n");
+            data = (char *)png_lrg7;
+            size = sizeof(png_lrg7)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "sm.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small JPEG icon\n");
+            data = (char *)jpeg_sm7;
+            size = sizeof(jpeg_sm7)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else if( strcmp(icon, "lrg.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large JPEG icon\n");
+            data = (char *)jpeg_lrg7;
+            size = sizeof(jpeg_lrg7)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else
+        {
+            DPRINTF(E_WARN, L_HTTP, "Invalid icon request: %s\n", icon);
+            Send404(h);
+            return;
+        }
+    }
+    else if(model == 8)//CM-32_AC2600
+    {
+        DPRINTF(E_WARN, L_SCANNER, _("CM-32_AC2600\n"));
+        if( strcmp(icon, "sm.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small PNG icon\n");
+            data = (char *)png_sm8;
+            size = sizeof(png_sm8)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "lrg.png") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large PNG icon\n");
+            data = (char *)png_lrg8;
+            size = sizeof(png_lrg8)-1;
+            strcpy(mime+6, "png");
+        }
+        else if( strcmp(icon, "sm.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending small JPEG icon\n");
+            data = (char *)jpeg_sm8;
+            size = sizeof(jpeg_sm8)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else if( strcmp(icon, "lrg.jpg") == 0 )
+        {
+            DPRINTF(E_DEBUG, L_HTTP, "Sending large JPEG icon\n");
+            data = (char *)jpeg_lrg8;
+            size = sizeof(jpeg_lrg8)-1;
+            strcpy(mime+6, "jpeg");
+        }
+        else
+        {
+            DPRINTF(E_WARN, L_HTTP, "Invalid icon request: %s\n", icon);
+            Send404(h);
+            return;
+        }
+    }
+    INIT_STR(str, header);
+
+    start_dlna_header(&str, 200, "Interactive", mime);
+    strcatf(&str, "Content-Length: %d\r\n\r\n", size);
+
+    if( send_data(h, str.data, str.off, MSG_MORE) == 0 )
+    {
+        if( h->req_command != EHead )
+            send_data(h, data, size, 0);
+    }
+    CloseSocket_upnphttp(h);
+}
+
+#else
+#include <shutils.h>
+#if (!defined(RTN66U) && !defined(RTN56U))
+extern unsigned char buf_png_sm[];
+extern unsigned char buf_png_lrg[];
+extern unsigned char buf_jpeg_sm[];
+extern unsigned char buf_jpeg_lrg[];
+extern int size_png_sm;
+extern int size_png_lrg;
+extern int size_jpeg_sm;
+extern int size_jpeg_lrg;
+#endif
+
 static void
 SendResp_icon(struct upnphttp * h, char * icon)
 {
@@ -1385,7 +1888,7 @@ SendResp_icon(struct upnphttp * h, char * icon)
 	char *data;
 	int size;
 	struct string_s str;
-
+#if defined(RTN66U) || defined(RTN56U)
 	if( strcmp(icon, "sm.png") == 0 )
 	{
 		DPRINTF(E_DEBUG, L_HTTP, "Sending small PNG icon\n");
@@ -1414,6 +1917,36 @@ SendResp_icon(struct upnphttp * h, char * icon)
 		size = sizeof(jpeg_lrg)-1;
 		strcpy(mime+6, "jpeg");
 	}
+#else
+	if( strcmp(icon, "sm.png") == 0 )
+	{
+		DPRINTF(E_DEBUG, L_HTTP, "Sending small PNG icon\n");
+		data = (char *)buf_png_sm;
+		size = size_png_sm;
+		strcpy(mime+6, "png");
+	}
+	else if( strcmp(icon, "lrg.png") == 0 )
+	{
+		DPRINTF(E_DEBUG, L_HTTP, "Sending large PNG icon\n");
+		data = (char *)buf_png_lrg;
+		size = size_png_lrg;
+		strcpy(mime+6, "png");
+	}
+	else if( strcmp(icon, "sm.jpg") == 0 )
+	{
+		DPRINTF(E_DEBUG, L_HTTP, "Sending small JPEG icon\n");
+		data = (char *)buf_jpeg_sm;
+		size = size_jpeg_sm;
+		strcpy(mime+6, "jpeg");
+	}
+	else if( strcmp(icon, "lrg.jpg") == 0 )
+	{
+		DPRINTF(E_DEBUG, L_HTTP, "Sending large JPEG icon\n");
+		data = (char *)buf_jpeg_lrg;
+		size = size_jpeg_lrg;
+		strcpy(mime+6, "jpeg");
+	}
+#endif
 	else
 	{
 		DPRINTF(E_WARN, L_HTTP, "Invalid icon request: %s\n", icon);
@@ -1433,6 +1966,7 @@ SendResp_icon(struct upnphttp * h, char * icon)
 	}
 	CloseSocket_upnphttp(h);
 }
+#endif
 
 static void
 SendResp_albumArt(struct upnphttp * h, char * object)
@@ -1620,14 +2154,30 @@ SendResp_resizedimg(struct upnphttp * h, char * object)
 	char *resolution = NULL;
 	char *key, *val;
 	char *saveptr, *item = NULL;
-	int rotate;
+	int rotate = 0;
 	int pixw = 0, pixh = 0;
 	long long id;
 	int rows=0, chunked, ret;
 	image_s *imsrc = NULL, *imdst = NULL;
 	int scale = 1;
 	const char *tmode;
-
+#if defined MS_IPK || defined MS_LIMIT
+	//avoid OOM when generate the small pic 
+	char *cache_file;
+	char *no_thumb_image_path_dir = NULL;
+	char no_thumb_image_path_dir_buf[PATH_MAX] = {0};
+	char no_thumb_image_path[PATH_MAX] = {0};
+	/* Get no_thumb_image_path */
+#ifdef MS_IPK
+	no_thumb_image_path_dir = realpath("/opt/etc/downloadmaster/mediaserverui/images", no_thumb_image_path_dir_buf);
+#else
+    no_thumb_image_path_dir = realpath("/www/images", no_thumb_image_path_dir_buf);
+#endif
+	if (no_thumb_image_path_dir)
+		snprintf(no_thumb_image_path, sizeof(no_thumb_image_path), "%s/ic_file_image.jpg", no_thumb_image_path_dir);
+	else
+		snprintf(no_thumb_image_path, sizeof(no_thumb_image_path), "%s/ic_file_image.jpg", no_thumb_image_path_dir_buf);
+#endif
 	id = strtoll(object, &saveptr, 10);
 	snprintf(buf, sizeof(buf), "SELECT PATH, RESOLUTION, ROTATION from DETAILS where ID = '%lld'", (long long)id);
 	ret = sql_get_table(db, buf, &result, &rows, NULL);
@@ -1682,6 +2232,7 @@ SendResp_resizedimg(struct upnphttp * h, char * object)
 		}
 	}
 
+#if !defined MS_IPK && !defined MS_LIMIT
 #if USE_FORK
 	pid_t newpid = 0;
 	newpid = process_fork(h->req_client);
@@ -1690,6 +2241,7 @@ SendResp_resizedimg(struct upnphttp * h, char * object)
 		CloseSocket_upnphttp(h);
 		goto resized_error;
 	}
+#endif
 #endif
 	if( h->reqflags & (FLAG_XFERSTREAMING|FLAG_RANGE) )
 	{
@@ -1759,11 +2311,13 @@ SendResp_resizedimg(struct upnphttp * h, char * object)
 		scale = 2;
 
 	INIT_STR(str, header);
-
+	
+#if !defined MS_IPK && !defined MS_LIMIT
 #if USE_FORK
 	if( (h->reqflags & FLAG_XFERBACKGROUND) && (setpriority(PRIO_PROCESS, 0, 19) == 0) )
 		tmode = "Background";
 	else
+#endif
 #endif
 		tmode = "Interactive";
 	start_dlna_header(&str, 200, tmode, "image/jpeg");
@@ -1773,7 +2327,14 @@ SendResp_resizedimg(struct upnphttp * h, char * object)
 	if( strcmp(h->HttpVer, "HTTP/1.0") == 0 )
 	{
 		chunked = 0;
+#if defined MS_IPK || defined MS_LIMIT
+		if (thumb_cache_exists(file_path, &cache_file))
+			imsrc = image_new_from_jpeg(cache_file, 1, NULL, 0, 1, rotate);
+		else
+			imsrc = image_new_from_jpeg(no_thumb_image_path, 1, NULL, 0, 1, rotate);
+#else
 		imsrc = image_new_from_jpeg(file_path, 1, NULL, 0, scale, rotate);
+#endif
 	}
 	else
 	{
@@ -1790,7 +2351,11 @@ SendResp_resizedimg(struct upnphttp * h, char * object)
 			goto resized_error;
 		}
 
+#if defined MS_IPK || defined MS_LIMIT
+		imdst = imsrc;
+#else
 		imdst = image_resize(imsrc, dstw, dsth);
+#endif
 		data = image_save_to_jpeg_buf(imdst, &size);
 
 		strcatf(&str, "Content-Length: %d\r\n\r\n", size);
@@ -1800,14 +2365,27 @@ SendResp_resizedimg(struct upnphttp * h, char * object)
 	{
 		if( chunked )
 		{
+
+#if defined MS_IPK || defined MS_LIMIT
+			if (thumb_cache_exists(file_path, &cache_file))
+				imsrc = image_new_from_jpeg(cache_file, 1, NULL, 0, 1, rotate);
+			else
+			imsrc = image_new_from_jpeg(no_thumb_image_path, 1, NULL, 0, 1, rotate);
+#else
 			imsrc = image_new_from_jpeg(file_path, 1, NULL, 0, scale, rotate);
+#endif
 			if( !imsrc )
 			{
 				DPRINTF(E_WARN, L_HTTP, "Unable to open image %s!\n", file_path);
 				Send500(h);
 				goto resized_error;
 			}
+			
+#if defined MS_IPK || defined MS_LIMIT
+			imdst = imsrc;
+#else
 			imdst = image_resize(imsrc, dstw, dsth);
+#endif
 			data = image_save_to_jpeg_buf(imdst, &size);
 
 			ret = sprintf(buf, "%x\r\n", size);
@@ -1823,14 +2401,25 @@ SendResp_resizedimg(struct upnphttp * h, char * object)
 	DPRINTF(E_INFO, L_HTTP, "Done serving %s\n", file_path);
 	if( imsrc )
 		image_free(imsrc);
-	if( imdst )
-		image_free(imdst);
+#if defined MS_IPK || defined MS_LIMIT
+    if(cache_file){
+        free(cache_file);
+        cache_file=NULL;
+    }
+    if (data)
+        free(data);
+#else
+    if( imdst )
+        image_free(imdst);
+#endif
 	CloseSocket_upnphttp(h);
 resized_error:
 	sqlite3_free_table(result);
+#if !defined MS_IPK && !defined MS_LIMIT
 #if USE_FORK
 	if( newpid == 0 )
 		_exit(0);
+#endif
 #endif
 }
 
