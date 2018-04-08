@@ -54,6 +54,8 @@
 #include "config.h"
 #include "upnpglobalvars.h"
 
+#include "upnpdescstrings.h"
+
 /* startup time */
 time_t startup_time = 0;
 
@@ -90,3 +92,4 @@ volatile short int quitting = 0;
 volatile uint32_t updateID = 0;
 const char *force_sort_criteria = NULL;
 short int rescan_db = 0;
+int web_status = 0;

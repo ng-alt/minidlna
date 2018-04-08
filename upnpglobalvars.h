@@ -208,7 +208,7 @@ extern char modelname[];
 #define MODELNUMBER_MAX_LEN 16
 extern char modelnumber[];
 
-#define SERIALNUMBER_MAX_LEN 16
+#define SERIALNUMBER_MAX_LEN 18
 extern char serialnumber[];
 
 #define PRESENTATIONURL_MAX_LEN 64
@@ -234,5 +234,6 @@ extern volatile short int quitting;
 extern volatile uint32_t updateID;
 extern const char *force_sort_criteria;
 extern short int rescan_db;
+extern int web_status;
 
 #endif
