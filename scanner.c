@@ -49,8 +49,6 @@
 
 int valid_cache = 0;
 
-extern char *adminfolder[256];
-
 struct virtual_item
 {
 	sqlite3_int64 objectID;
@@ -140,7 +138,7 @@ insert_containers(const char * name, const char *path, const char * refID, const
 	if( strstr(class, "imageItem") )
 	{
 		char *date = NULL, *cam = NULL;
-		char date_taken[13], camera[64];
+		char date_taken[24], camera[64];
 		static struct virtual_item last_date;
 		static struct virtual_item last_cam;
 		static struct virtual_item last_camdate;
@@ -161,7 +159,7 @@ insert_containers(const char * name, const char *path, const char * refID, const
 		}
 		else
 		{
-			strcpy(date_taken, _("Unknown Date"));
+			snprintf(date_taken, sizeof(date_taken), "%s", _("Unknown Date"));
 		}
 		if( valid_cache && strcmp(last_date.name, date_taken) == 0 )
 		{
@@ -445,8 +443,7 @@ insert_directory(const char * name, const char * path, const char * base, const 
 		free(dir_buf);
 		return 0;
 	}
-	if(strcmp(path,"/tmp/shares/USB_Storage")==0)
-  strcpy(name,"Browse Folders");
+
 	detailID = GetFolderMetadata(name, path, NULL, NULL, find_album_art(path, NULL, 0));
 	sql_exec(db, "INSERT into OBJECTS"
 	             " (OBJECT_ID, PARENT_ID, REF_ID, DETAIL_ID, CLASS, NAME) "
@@ -716,7 +713,6 @@ filter_media(const struct dirent *d)
 	       ) ));
 }
 
-#define MAX_FILE_NUMBER 25000
 void
 ScanDirectory(const char * dir, const char * parent, enum media_types dir_type)
 {
@@ -725,18 +721,13 @@ ScanDirectory(const char * dir, const char * parent, enum media_types dir_type)
 	char parent_id[PATH_MAX];
 	char full_path[PATH_MAX];
 	char * name = NULL;
-	static unsigned int fileno = 0;
+	static long long unsigned int fileno = 0;
 	enum file_types type;
-
-    int k;
-    int adminflag=0; //add by lawrence adminflag=1 the folder is admin. 
 
 	setlocale(LC_COLLATE, "");
 	if( chdir(dir) != 0 )
 		return;
 
-    if(fileno >= MAX_FILE_NUMBER) // stop scanner
-		return;
 	DPRINTF(parent?E_INFO:E_WARN, L_SCANNER, _("Scanning %s\n"), dir);
 	switch( dir_type )
 	{
@@ -774,35 +765,7 @@ ScanDirectory(const char * dir, const char * parent, enum media_types dir_type)
 #endif
 		type = TYPE_UNKNOWN;
 		sprintf(full_path, "%s/%s", dir, namelist[i]->d_name);
-		
 		name = escape_tag(namelist[i]->d_name, 1);
-		
-		/*Foxconn add start by lawrence 2013/02/06 fixed all USB folder can acess*/
-		// if the folder is admin then set adminflag=1
-		for(k=0;k<(sizeof(adminfolder)/sizeof(adminfolder[0]));k++)
-		{
-		 if(adminfolder[k]!='\0')
-		  {
-		  
-		  	//printf("************************************\n");
-		    //printf("adminfolder[%d]=%s\n",k,adminfolder[k]); 
-		    //printf("************************************\n");
-		  
-		     if(strcmp(full_path,adminfolder[k])==0)
-		     {
-			     adminflag=1;
-				 break;
-		     }
-		  }
-		}
-
-		if(adminflag==1)
-		{
-		   adminflag=0;
-		   continue;
-		}
-		/*Foxconn add start by lawrence 2013/02/06 fixed all USB folder can acess*/
-		
 		if( namelist[i]->d_type == DT_DIR )
 		{
 			type = TYPE_DIR;
@@ -823,15 +786,8 @@ ScanDirectory(const char * dir, const char * parent, enum media_types dir_type)
 		}
 		else if( type == TYPE_FILE && (access(full_path, R_OK) == 0) )
 		{
-			if( insert_file(name?name:namelist[i]->d_name, full_path, (parent ? parent:""), i+startID) == 0 )
-            {
+			if( insert_file(name, full_path, (parent ? parent:""), i+startID) == 0 )
 				fileno++;
-                if(fileno >= MAX_FILE_NUMBER){
-                    /*stop scanner*/
-                    n = 0;
-                }
-
-            }
 		}
 		free(name);
 		free(namelist[i]);
@@ -861,10 +817,7 @@ start_scanner()
 	if( flag )
 		fclose(flag);
 #endif
-//	freopen("/dev/null", "a", stderr);
-printf("minidlan :scan files\n");
-     
-
+	freopen("/dev/null", "a", stderr);
 	while( media_path )
 	{
 		strncpy(name, media_path->path, sizeof(name));

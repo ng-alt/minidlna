@@ -261,6 +261,7 @@ getfriendlyname(char * buf, int len)
 		}
 	}
 	fclose(info);
+#if PNPX
 	memcpy(pnpx_hwid+4, "01F2", 4);
 	if( strcmp(modelnumber, "NVX") == 0 )
 		memcpy(pnpx_hwid+17, "0101", 4);
@@ -283,6 +284,7 @@ getfriendlyname(char * buf, int len)
 		memcpy(pnpx_hwid+17, "0108", 4);
 	else if( strcmp(modelnumber, "NV+ v2") == 0 )
 		memcpy(pnpx_hwid+17, "0109", 4);
+#endif
 #else
 	char * logname;
 	logname = getenv("LOGNAME");
@@ -295,10 +297,7 @@ getfriendlyname(char * buf, int len)
 			logname = pwent->pw_name;
 	}
 #endif
-/* Modify by Foxconn Antony start 02/17/2012 set the properly friendly name */
-//	snprintf(buf+off, len-off, "%s", logname?logname:"Unknown");
-	snprintf(buf+off, len-off, "%s", logname?logname:"ReadyShare");
-/* Modify by Foxconn Antony end 02/17/2012 */
+	snprintf(buf+off, len-off, "%s", logname?logname:"Unknown");
 #endif
 }
 
@@ -599,7 +598,7 @@ init(int argc, char * * argv)
 	if( log_path[0] == '\0' )
 	{
 		if( db_path[0] == '\0' )
-			strncpyt(log_path, "/tmp/log", PATH_MAX);
+			strncpyt(log_path, DEFAULT_LOG_PATH, PATH_MAX);
 		else
 			strncpyt(log_path, db_path, PATH_MAX);
 	}
@@ -747,19 +746,11 @@ init(int argc, char * * argv)
 		}
 	}
 	/* If no IP was specified, try to detect one */
-
 	if( n_lan_addr < 1 )
 	{
-
-		if( (getsysaddrs() <= 0 ) &&
-		    (getifaddr("eth0", ip_addr, sizeof(ip_addr)) < 0) &&
-		    (getifaddr("eth1", ip_addr, sizeof(ip_addr)) < 0) )
+		if( getsysaddrs() <= 0 )
 		{
-			DPRINTF(E_OFF, L_GENERAL, "No IP address automatically detected!\n");
-		}
-		if( *ip_addr && parselanaddr(&lan_addr[n_lan_addr], ip_addr) == 0 )
-		{
-			n_lan_addr++;
+			DPRINTF(E_FATAL, L_GENERAL, "No IP address automatically detected!\n");
 		}
 	}
 
@@ -909,8 +900,7 @@ main(int argc, char * * argv)
 		updateID = sql_get_int_field(db, "SELECT UPDATE_ID from SETTINGS");
 	}
 	i = db_upgrade(db);
-//	if( i != 0 )
-	if(1)
+	if( i != 0 )
 	{
 		if( i < 0 )
 		{
@@ -933,7 +923,6 @@ main(int argc, char * * argv)
 		}
 		free(cmd);
 		open_db();
-
 		if( CreateDatabase() != 0 )
 		{
 			DPRINTF(E_FATAL, L_GENERAL, "ERROR: Failed to create sqlite database!  Exiting...\n");
@@ -964,7 +953,6 @@ main(int argc, char * * argv)
 				free(last_name);
 			}
 			freeoptions();
-printf("\n\n\n\nminidlan:scan finished\n\n\n");
 			exit(EXIT_SUCCESS);
 		}
 #else
@@ -982,7 +970,6 @@ printf("\n\n\n\nminidlan:scan finished\n\n\n");
 	{
 		DPRINTF(E_INFO, L_GENERAL, "Enabled interface %s/%s\n",
 		        lan_addr[i].str, inet_ntoa(lan_addr[i].mask));
-
 	}
 
 	sudp = OpenAndConfSSDPReceiveSocket(n_lan_addr, lan_addr);
@@ -1200,37 +1187,32 @@ printf("\n\n\n\nminidlan:scan finished\n\n\n");
 			socklen_t clientnamelen;
 			struct sockaddr_in clientname;
 			clientnamelen = sizeof(struct sockaddr_in);
- 			shttp = accept(shttpl, (struct sockaddr *)&clientname, &clientnamelen);
-			if(!is_disk_mounted())
-			    close(shttp);
+			shttp = accept(shttpl, (struct sockaddr *)&clientname, &clientnamelen);
+			if(shttp<0)
+			{
+				DPRINTF(E_ERROR, L_GENERAL, "accept(http): %s\n", strerror(errno));
+			}
 			else
 			{
-    			if(shttp<0)
-		    	{
-				    DPRINTF(E_ERROR, L_GENERAL, "accept(http): %s\n", strerror(errno));
-    			}
-		    	else
-    			{
-		    		struct upnphttp * tmp = 0;
-				    DPRINTF(E_DEBUG, L_GENERAL, "HTTP connection from %s:%d\n",
-    				inet_ntoa(clientname.sin_addr),
-		   			ntohs(clientname.sin_port) );
-    				/*if (fcntl(shttp, F_SETFL, O_NONBLOCK) < 0) {
-		    			DPRINTF(E_ERROR, L_GENERAL, "fcntl F_SETFL, O_NONBLOCK\n");
-    				}*/
-		    		/* Create a new upnphttp object and add it to
-    				 * the active upnphttp object list */
-		   		tmp = New_upnphttp(shttp);
-				  if(tmp)
-  				{
-	  				tmp->clientaddr = clientname.sin_addr;
-		  			LIST_INSERT_HEAD(&upnphttphead, tmp, entries);
-			  	}
-				  else
-  				{
-	  				DPRINTF(E_ERROR, L_GENERAL, "New_upnphttp() failed\n");
-		  			close(shttp);
-		  		}
+				struct upnphttp * tmp = 0;
+				DPRINTF(E_DEBUG, L_GENERAL, "HTTP connection from %s:%d\n",
+					inet_ntoa(clientname.sin_addr),
+					ntohs(clientname.sin_port) );
+				/*if (fcntl(shttp, F_SETFL, O_NONBLOCK) < 0) {
+					DPRINTF(E_ERROR, L_GENERAL, "fcntl F_SETFL, O_NONBLOCK\n");
+				}*/
+				/* Create a new upnphttp object and add it to
+				 * the active upnphttp object list */
+				tmp = New_upnphttp(shttp);
+				if(tmp)
+				{
+					tmp->clientaddr = clientname.sin_addr;
+					LIST_INSERT_HEAD(&upnphttphead, tmp, entries);
+				}
+				else
+				{
+					DPRINTF(E_ERROR, L_GENERAL, "New_upnphttp() failed\n");
+					close(shttp);
 				}
 			}
 		}

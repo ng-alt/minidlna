@@ -75,7 +75,4 @@ is_album_art(const char * name);
 int
 resolve_unknown_type(const char * path, enum media_types dir_type);
 
-
-int is_disk_mounted();
-
 #endif

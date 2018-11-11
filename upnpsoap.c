@@ -111,25 +111,11 @@ GetSystemUpdateID(struct upnphttp * h, const char * action)
 
 	char body[512];
 	int bodylen;
-	struct NameValueParserData data;
-	char *dummyArgument;
 
-	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
-  dummyArgument = GetValueFromNameValueList(&data, "dummyArgument");
-
-  if(dummyArgument)
-  {
-			SoapError(h, 500, "Invalid Args");
-      goto get_system_update_id_error;
-  }
 	bodylen = snprintf(body, sizeof(body), resp,
 		action, "urn:schemas-upnp-org:service:ContentDirectory:1",
 		updateID, action);
 	BuildSendAndCloseSoapResp(h, body, bodylen);
-
-get_system_update_id_error:
-	ClearNameValueList(&data);
-	
 }
 
 static void
@@ -145,18 +131,9 @@ IsAuthorizedValidated(struct upnphttp * h, const char * action)
 	int bodylen;
 	struct NameValueParserData data;
 	const char * id;
-	char *dummyArgument;
 
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
 	id = GetValueFromNameValueList(&data, "DeviceID");
-  dummyArgument = GetValueFromNameValueList(&data, "dummyArgument");
-
-  if(dummyArgument)
-  {
-			SoapError(h, 402, "Invalid Args");
-      goto is_authorized_error;
-  }
-
 	if (!id)
 		id = strstr(h->req_buf + h->req_contentoff, "<DeviceID");
 	if(id)
@@ -169,7 +146,6 @@ IsAuthorizedValidated(struct upnphttp * h, const char * action)
 	else
 		SoapError(h, 402, "Invalid Args");
 
-is_authorized_error:
 	ClearNameValueList(&data);	
 }
 
@@ -188,24 +164,11 @@ GetProtocolInfo(struct upnphttp * h, const char * action)
 	char * body;
 	int bodylen;
 
-	struct NameValueParserData data;
-	char *dummyArgument;
-
-	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
-  dummyArgument = GetValueFromNameValueList(&data, "dummyArgument");
-
-  if(dummyArgument)
-  {
-			SoapError(h, 402, "Invalid Args");
-      goto get_protocol_id_error;
-  }
 	bodylen = asprintf(&body, resp,
 		action, "urn:schemas-upnp-org:service:ConnectionManager:1",
 		action);	
 	BuildSendAndCloseSoapResp(h, body, bodylen);
 	free(body);
-get_protocol_id_error:
-	ClearNameValueList(&data);
 }
 
 static void
@@ -226,30 +189,15 @@ GetSortCapabilities(struct upnphttp * h, const char * action)
 	char body[512];
 	int bodylen;
 
-	struct NameValueParserData data;
-	char *dummyArgument;
-
-	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
-  dummyArgument = GetValueFromNameValueList(&data, "dummyArgument");
-
-  if(dummyArgument)
-  {
-			SoapError(h, 402, "Invalid Args");
-      goto get_sort_capabilities_error;
-  }
 	bodylen = snprintf(body, sizeof(body), resp,
 		action, "urn:schemas-upnp-org:service:ContentDirectory:1",
 		action);	
 	BuildSendAndCloseSoapResp(h, body, bodylen);
-	
-get_sort_capabilities_error:
-	ClearNameValueList(&data);
 }
 
 static void
 GetSearchCapabilities(struct upnphttp * h, const char * action)
 {
-	
 	static const char resp[] =
 		"<u:%sResponse xmlns:u=\"%s\">"
 		"<SearchCaps>"
@@ -268,31 +216,10 @@ GetSearchCapabilities(struct upnphttp * h, const char * action)
 	char body[512];
 	int bodylen;
 
-	struct NameValueParserData data;
-	char *SearchCaps,*dummyArgument;
-
-	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
-  SearchCaps = GetValueFromNameValueList(&data, "SearchCaps");
-  dummyArgument = GetValueFromNameValueList(&data, "dummyArgument");
-
-  if(dummyArgument)
-  {
-			SoapError(h, 402, "Invalid Args");
-      goto search_capabilities_error;
-  }
-/*
-  if(!SearchCaps)
-  {
-		SoapError(h, 402, "Invalid Args");
-      goto search_capabilities_error;
-  }
-*/  
 	bodylen = snprintf(body, sizeof(body), resp,
 		action, "urn:schemas-upnp-org:service:ContentDirectory:1",
 		action);	
 	BuildSendAndCloseSoapResp(h, body, bodylen);
-search_capabilities_error:	
-	ClearNameValueList(&data);
 }
 
 static void
@@ -307,26 +234,11 @@ GetCurrentConnectionIDs(struct upnphttp * h, const char * action)
 
 	char body[512];
 	int bodylen;
-	struct NameValueParserData data;
-	char *dummyArgument;
-
-	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
-  dummyArgument = GetValueFromNameValueList(&data, "dummyArgument");
-
-  if(dummyArgument)
-  {
-			SoapError(h, 402, "Invalid Args");
-      goto get_current_connection_ids_error;
-  }
 
 	bodylen = snprintf(body, sizeof(body), resp,
 		action, "urn:schemas-upnp-org:service:ConnectionManager:1",
 		action);	
 	BuildSendAndCloseSoapResp(h, body, bodylen);
-	
-get_current_connection_ids_error:
-	ClearNameValueList(&data);
-	
 }
 
 static void
@@ -345,24 +257,14 @@ GetCurrentConnectionInfo(struct upnphttp * h, const char * action)
 		"<Status>Unknown</Status>"
 		"</u:%sResponse>";
 
-	struct NameValueParserData data;
-	char * ConnectionID,*dummyArgument;
-
 	char body[sizeof(resp)+128];
 	int bodylen;
+	struct NameValueParserData data;
 	const char * id_str;
 	int id;
 	char *endptr;
+
 	ParseNameValue(h->req_buf + h->req_contentoff, h->req_contentlen, &data);
-  dummyArgument = GetValueFromNameValueList(&data, "dummyArgument");
-
-  if(dummyArgument)
-  {
-			SoapError(h, 402, "Invalid Args");
-      goto get_connection_info_error;
-  }
-
-
 	id_str = GetValueFromNameValueList(&data, "ConnectionID");
 	DPRINTF(E_INFO, L_HTTP, "GetCurrentConnectionInfo(%s)\n", id_str);
 	if(id_str)
@@ -382,7 +284,6 @@ GetCurrentConnectionInfo(struct upnphttp * h, const char * action)
 			action);	
 		BuildSendAndCloseSoapResp(h, body, bodylen);
 	}
-get_connection_info_error:
 	ClearNameValueList(&data);	
 }
 
@@ -641,67 +542,6 @@ set_filter_flags(char * filter, struct upnphttp *h)
 	return flags;
 }
 
-int
-check_sort_criteria(char *sortCriteria)
-{
-	char *item, *saveptr;
-	int i, ret, reverse, title_sorted = 0;
-	int ret_value = 0;
-
-	item = strtok_r(sortCriteria, ",", &saveptr);
-
-	for( i=0; item != NULL; i++ )
-	{
-		reverse=0;
-
-		if( *item == '+' )
-		{
-			item++;
-		}
-		else if( *item == '-' )
-		{
-			reverse = 1;
-			item++;
-		}
-		else
-		{
-			DPRINTF(E_DEBUG, L_HTTP, "No order specified [%s]\n", item);
-			ret_value = -1;
-			goto unhandled_order;
-		}
-		if( strcasecmp(item, "upnp:class") == 0 )
-		{
-		}
-		else if( strcasecmp(item, "dc:title") == 0 )
-		{
-		}
-		else if( strcasecmp(item, "dc:date") == 0 )
-		{
-		}
-		else if( strcasecmp(item, "upnp:originalTrackNumber") == 0 )
-		{
-		}
-		else if( strcasecmp(item, "upnp:album") == 0 )
-		{
-		}
-		else
-		{
-			DPRINTF(E_DEBUG, L_HTTP, "Unhandled SortCriteria [%s]\n", item);
-			ret_value = -1;
-printf("unhandled sort Criteria\n");
-			goto unhandled_order;
-		}
-
-		unhandled_order:
-    if(ret_value==-1)
-    	return ret_value;
-		item = strtok_r(NULL, ",", &saveptr);
-	}
-
-	return ret_value;
-}
-
-
 char *
 parse_sort_criteria(char *sortCriteria, int *error)
 {
@@ -815,12 +655,10 @@ add_resized_res(int srcw, int srch, int reqw, int reqh, char *dlna_pn,
 		strcatf(args->str, "resolution=\"%dx%d\" ", dstw, dsth);
 	}
 	strcatf(args->str, "protocolInfo=\"http-get:*:image/jpeg:"
-//	                          "DLNA.ORG_PN=%s;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=%08X%024X\"&gt;"
-	                          "DLNA.ORG_PN=%s\"&gt;"
+	                          "DLNA.ORG_PN=%s;DLNA.ORG_CI=1;DLNA.ORG_FLAGS=%08X%024X\"&gt;"
 	                          "http://%s:%d/Resized/%s.jpg?width=%d,height=%d"
 	                          "&lt;/res&gt;",
-//	                          dlna_pn, DLNA_FLAG_DLNA_V1_5|DLNA_FLAG_HTTP_STALLING|DLNA_FLAG_TM_B|DLNA_FLAG_TM_I, 0,
-	                          dlna_pn, 
+	                          dlna_pn, DLNA_FLAG_DLNA_V1_5|DLNA_FLAG_HTTP_STALLING|DLNA_FLAG_TM_B|DLNA_FLAG_TM_I, 0,
 	                          lan_addr[args->iface].str, runtime_vars.port,
 	                          detailID, dstw, dsth);
 }
@@ -924,8 +762,7 @@ callback(void *args, int argc, char **argv, char **azColName)
 
 	if( strncmp(class, "item", 4) == 0 )
 	{
-//		uint32_t dlna_flags = DLNA_FLAG_DLNA_V1_5|DLNA_FLAG_HTTP_STALLING|DLNA_FLAG_TM_B;
-		uint32_t dlna_flags = DLNA_FLAG_DLNA_V1_5|DLNA_FLAG_TM_B;
+		uint32_t dlna_flags = DLNA_FLAG_DLNA_V1_5|DLNA_FLAG_HTTP_STALLING|DLNA_FLAG_TM_B;
 		char *alt_title = NULL;
 		/* We may need special handling for certain MIME types */
 		if( *mime == 'v' )
@@ -1007,18 +844,15 @@ callback(void *args, int argc, char **argv, char **azColName)
 
 		if( dlna_pn )
 			snprintf(dlna_buf, sizeof(dlna_buf), "DLNA.ORG_PN=%s;"
-//			                                     "DLNA.ORG_OP=01;"
-//			                                     "DLNA.ORG_CI=0;"
-//			                                     "DLNA.ORG_FLAGS=%08X%024X",
-//			                                     dlna_pn, dlna_flags, 0);
-			                                     "DLNA.ORG_OP=01",
-			                                     dlna_pn);
+			                                     "DLNA.ORG_OP=01;"
+			                                     "DLNA.ORG_CI=0;"
+			                                     "DLNA.ORG_FLAGS=%08X%024X",
+			                                     dlna_pn, dlna_flags, 0);
 		else if( passed_args->flags & FLAG_DLNA )
-//			snprintf(dlna_buf, sizeof(dlna_buf), "DLNA.ORG_OP=01;"
-//			                                     "DLNA.ORG_CI=0;"
-//			                                     "DLNA.ORG_FLAGS=%08X%024X",
-//			                                     dlna_flags, 0);
-			snprintf(dlna_buf, sizeof(dlna_buf), "DLNA.ORG_OP=01");
+			snprintf(dlna_buf, sizeof(dlna_buf), "DLNA.ORG_OP=01;"
+			                                     "DLNA.ORG_CI=0;"
+			                                     "DLNA.ORG_FLAGS=%08X%024X",
+			                                     dlna_flags, 0);
 		else
 			strcpy(dlna_buf, "*");
 
@@ -1086,7 +920,7 @@ callback(void *args, int argc, char **argv, char **azColName)
 				ret = strcatf(str, "&lt;upnp:album&gt;%s&lt;/upnp:album&gt;", "[No Keywords]");
 
 			/* EVA2000 doesn't seem to handle embedded thumbnails */
-			if( passed_args->client != ENetgearEVA2000 && tn && atoi(tn) ) {
+			if( !(passed_args->flags & FLAG_RESIZE_THUMBS) && tn && atoi(tn) ) {
 				ret = strcatf(str, "&lt;upnp:albumArtURI&gt;"
 				                   "http://%s:%d/Thumbnails/%s.jpg"
 			        	           "&lt;/upnp:albumArtURI&gt;",
@@ -1100,32 +934,28 @@ callback(void *args, int argc, char **argv, char **azColName)
 		}
 		if( passed_args->filter & FILTER_RES ) {
 			mime_to_ext(mime, ext);
-			if( (passed_args->client == EFreeBox) && tn && atoi(tn) ) {
-				ret = strcatf(str, "&lt;res protocolInfo=\"http-get:*:%s:%s\"&gt;"
-				                   "http://%s:%d/Thumbnails/%s.jpg"
-				                   "&lt;/res&gt;",
-				                   mime, "DLNA.ORG_PN=JPEG_TN", lan_addr[passed_args->iface].str,
-				                   runtime_vars.port, detailID);
-			}
 			add_res(size, duration, bitrate, sampleFrequency, nrAudioChannels,
 			        resolution, dlna_buf, mime, detailID, ext, passed_args);
-			if( (*mime == 'i') && (passed_args->client != EFreeBox) ) {
-				int srcw = atoi(strsep(&resolution, "x"));
-				int srch = atoi(resolution);
-				if( !dlna_pn ) {
-					add_resized_res(srcw, srch, 4096, 4096, "JPEG_LRG", detailID, passed_args);
+			if( *mime == 'i' ) {
+				int srcw, srch;
+				if( resolution && (sscanf(resolution, "%dx%d", &srcw, &srch) == 2) )
+				{
+					if( srcw > 4096 || srch > 4096 )
+						add_resized_res(srcw, srch, 4096, 4096, "JPEG_LRG", detailID, passed_args);
+					if( srcw > 1024 || srch > 768 )
+						add_resized_res(srcw, srch, 1024, 768, "JPEG_MED", detailID, passed_args);
+					if( srcw > 640 || srch > 480 )
+						add_resized_res(srcw, srch, 640, 480, "JPEG_SM", detailID, passed_args);
 				}
-				if( !dlna_pn || !strncmp(dlna_pn, "JPEG_L", 6) || !strncmp(dlna_pn, "JPEG_M", 6) ) {
-					add_resized_res(srcw, srch, 640, 480, "JPEG_SM", detailID, passed_args);
-				}
-				if( tn && atoi(tn) ) {
+				if( !(passed_args->flags & FLAG_RESIZE_THUMBS) && tn && atoi(tn) ) {
 					ret = strcatf(str, "&lt;res protocolInfo=\"http-get:*:%s:%s\"&gt;"
 					                   "http://%s:%d/Thumbnails/%s.jpg"
 					                   "&lt;/res&gt;",
-//					                   mime, "DLNA.ORG_PN=JPEG_TN;DLNA.ORG_CI=1", lan_addr[passed_args->iface].str,
-					                   mime, "DLNA.ORG_PN=JPEG_TN", lan_addr[passed_args->iface].str,
+					                   mime, "DLNA.ORG_PN=JPEG_TN;DLNA.ORG_CI=1", lan_addr[passed_args->iface].str,
 					                   runtime_vars.port, detailID);
 				}
+				else
+					add_resized_res(srcw, srch, 160, 160, "JPEG_TN", detailID, passed_args);
 			}
 			else if( *mime == 'v' ) {
 				switch( passed_args->client ) {
@@ -1136,8 +966,7 @@ callback(void *args, int argc, char **argv, char **azColName)
 					     strncmp(dlna_pn, "AVC_TS_MP_HD_AC3", 16) == 0 ||
 					     strncmp(dlna_pn, "AVC_TS_HP_HD_AC3", 16) == 0))
 					{
-//						sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01;DLNA.ORG_CI=0", "MPEG_PS_NTSC");
-						sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01", "MPEG_PS_NTSC");
+						sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01;DLNA.ORG_CI=0", "MPEG_PS_NTSC");
 						add_res(size, duration, bitrate, sampleFrequency, nrAudioChannels,
 						        resolution, dlna_buf, mime, detailID, ext, passed_args);
 					}
@@ -1149,15 +978,13 @@ callback(void *args, int argc, char **argv, char **azColName)
 					{
 						if( strncmp(dlna_pn, "MPEG_TS_SD_NA", 13) != 0 )
 						{
-//							sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01;DLNA.ORG_CI=0", "MPEG_TS_SD_NA");
-							sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01", "MPEG_TS_SD_NA");
+							sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01;DLNA.ORG_CI=0", "MPEG_TS_SD_NA");
 							add_res(size, duration, bitrate, sampleFrequency, nrAudioChannels,
 							        resolution, dlna_buf, mime, detailID, ext, passed_args);
 						}
 						if( strncmp(dlna_pn, "MPEG_TS_SD_EU", 13) != 0 )
 						{
-//							sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01;DLNA.ORG_CI=0", "MPEG_TS_SD_EU");
-							sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01", "MPEG_TS_SD_EU");
+							sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01;DLNA.ORG_CI=0", "MPEG_TS_SD_EU");
 							add_res(size, duration, bitrate, sampleFrequency, nrAudioChannels,
 							        resolution, dlna_buf, mime, detailID, ext, passed_args);
 						}
@@ -1172,15 +999,13 @@ callback(void *args, int argc, char **argv, char **azColName)
 						strcpy(mime+6, "avi");
 						if( !dlna_pn || strncmp(dlna_pn, "MPEG_PS_NTSC", 12) != 0 )
 						{
-//							sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01;DLNA.ORG_CI=0", "MPEG_PS_NTSC");
-							sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01", "MPEG_PS_NTSC");
+							sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01;DLNA.ORG_CI=0", "MPEG_PS_NTSC");
 							add_res(size, duration, bitrate, sampleFrequency, nrAudioChannels,
 						        	resolution, dlna_buf, mime, detailID, ext, passed_args);
 						}
 						if( !dlna_pn || strncmp(dlna_pn, "MPEG_PS_PAL", 11) != 0 )
 						{
-//							sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01;DLNA.ORG_CI=0", "MPEG_PS_PAL");
-							sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01", "MPEG_PS_PAL");
+							sprintf(dlna_buf, "DLNA.ORG_PN=%s;DLNA.ORG_OP=01;DLNA.ORG_CI=0", "MPEG_PS_PAL");
 							add_res(size, duration, bitrate, sampleFrequency, nrAudioChannels,
 						        	resolution, dlna_buf, mime, detailID, ext, passed_args);
 						}
@@ -1240,7 +1065,7 @@ callback(void *args, int argc, char **argv, char **azColName)
 		/* If the client calls for BrowseMetadata on root, we have to include our "upnp:searchClass"'s, unless they're filtered out */
 		if( (passed_args->requested == 1) && (strcmp(id, "0") == 0) )
 		{
-//			ret = strcatf(str, " searchable=\"1\"");
+			ret = strcatf(str, " searchable=\"1\"");
 			if( passed_args->filter & FILTER_UPNP_SEARCHCLASS )
 			{
 				ret = strcatf(str, "&gt;"
@@ -1324,14 +1149,6 @@ BrowseContentDirectory(struct upnphttp * h, const char * action)
 	BrowseFlag = GetValueFromNameValueList(&data, "BrowseFlag");
 	SortCriteria = GetValueFromNameValueList(&data, "SortCriteria");
 
-
-  if(SortCriteria)
-      if(check_sort_criteria(SortCriteria))
-      {
-		    SoapError(h, 500, "Invalid Args");
-		    goto browse_error;
-      }
-  
 	if( (ptr = GetValueFromNameValueList(&data, "RequestedCount")) )
 		RequestedCount = atoi(ptr);
 	if( RequestedCount < 0 )
@@ -1433,7 +1250,6 @@ BrowseContentDirectory(struct upnphttp * h, const char * action)
 	{
 		ret = sql_get_int_field(db, "SELECT count(*) from OBJECTS where PARENT_ID = '%q'", ObjectID);
 		totalMatches = (ret > 0) ? ret : 0;
-
 		ret = 0;
 		if( SortCriteria )
 		{
@@ -1470,7 +1286,6 @@ BrowseContentDirectory(struct upnphttp * h, const char * action)
 			SoapError(h, 709, "Unsupported or invalid sort criteria");
 			goto browse_error;
 		}
-
 
 		sql = sqlite3_mprintf( SELECT_COLUMNS
 		                      "from OBJECTS o left join DETAILS d on (d.ID = o.DETAIL_ID)"
@@ -1657,8 +1472,6 @@ SearchContentDirectory(struct upnphttp * h, const char * action)
 	                                     "(select count(*) from OBJECTS o left join DETAILS d on (o.DETAIL_ID = d.ID)"
 	                                     " where (OBJECT_ID = '%q') and (%s))",
 	                                     ContainerID, SearchCriteria, ContainerID, SearchCriteria);
-
-
 	if( totalMatches < 0 )
 	{
 		/* Must be invalid SQL, so most likely bad or unhandled search criteria. */
@@ -1699,8 +1512,6 @@ SearchContentDirectory(struct upnphttp * h, const char * action)
 	                                      "from OBJECTS o left join DETAILS d on (d.ID = o.DETAIL_ID)"
 	                                      " where OBJECT_ID = '%q' and (%s) ", ContainerID, SearchCriteria),
 	                      orderBy, StartingIndex, RequestedCount);
-
-
 	DPRINTF(E_DEBUG, L_HTTP, "Search SQL: %s\n", sql);
 	ret = sqlite3_exec(db, sql, callback, (void *) &args, &zErrMsg);
 	if( (ret != SQLITE_OK) && (zErrMsg != NULL) )

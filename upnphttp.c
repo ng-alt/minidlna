@@ -206,34 +206,6 @@ ParseHttpHeaders(struct upnphttp * h)
 			}
 			else if(strncasecmp(line, "Callback", 8)==0)
 			{
-#if 1
-				p = colon;
-				while( *p != '\r' )
-				{
-				    if(*p=='<')
-				    {
-				    	  p++;
-				        break;
-				    }
-				    else if(!isspace(*p))
-				    {
-                if(*p!=':')
-                    break;				        
-				    }
-            p++;				    	
-				}
-        
-				n = 0;
-				while(p[n] != '>' && p[n] != '\r' )
-					n++;
-//				h->req_Callback = p + 1;
-				h->req_Callback = p;
-				h->req_CallbackLen = MAX(0, n);
-				/* Verify callback validity */
-				if(strncmp(h->req_Callback, "http://", 7) != 0)
-					h->req_Callback = NULL;
-
-#else				
 				p = colon;
 				while(*p != '<' && *p != '\r' )
 					p++;
@@ -242,10 +214,6 @@ ParseHttpHeaders(struct upnphttp * h)
 					n++;
 				h->req_Callback = p + 1;
 				h->req_CallbackLen = MAX(0, n - 1);
-				/* Verify callback validity */
-				if(strncmp(h->req_Callback, "http://", 7) != 0)
-					h->req_Callback = NULL;
-#endif					
 			}
 			else if(strncasecmp(line, "SID", 3)==0)
 			{
@@ -264,7 +232,7 @@ ParseHttpHeaders(struct upnphttp * h)
 					while(isspace(*p))
 						p++;
 					n = 0;
-					while(!isspace(p[n]) && p[n]!='\r')
+					while(!isspace(p[n]))
 						n++;
 					h->req_SID = p;
 					h->req_SIDLen = n;
@@ -836,62 +804,48 @@ ProcessHTTPSubscribe_upnphttp(struct upnphttp * h, const char * path)
 	DPRINTF(E_DEBUG, L_HTTP, "Callback '%.*s' Timeout=%d\n",
 	       h->req_CallbackLen, h->req_Callback, h->req_Timeout);
 	DPRINTF(E_DEBUG, L_HTTP, "SID '%.*s'\n", h->req_SIDLen, h->req_SID);
-	if((!h->req_Callback && !h->req_SID) ||
-	   strncmp(h->req_NT, "upnp:event", h->req_NTLen) != 0) {
-		/* Missing or invalid CALLBACK : 412 Precondition Failed.
-		 * If CALLBACK header is missing or does not contain a valid HTTP URL,
-		 * the publisher must respond with HTTP error 412 Precondition Failed*/
-		BuildResp2_upnphttp(h, 412, "Precondition Failed", 0, 0);
-		SendResp_upnphttp(h);
-		CloseSocket_upnphttp(h);
-	}
-	else if(h->req_SID && strncmp(h->req_SID,"uuid",strlen("uuid")) && strncmp(h->req_SID,"12345",strlen("12345"))) {
-		BuildResp2_upnphttp(h, 412, "Precondition Failed", 0, 0);
-		SendResp_upnphttp(h);
-		CloseSocket_upnphttp(h);
-	
-	} else {
-	/* - add to the subscriber list
-	 * - respond HTTP/x.x 200 OK 
-	 * - Send the initial event message */
-	/* Server:, SID:; Timeout: Second-(xx|infinite) */
-		if(h->req_Callback) {
-			if(!h->req_NT || strncmp(h->req_NT, "upnp:event", h->req_NTLen) != 0) {
-				BuildResp2_upnphttp(h, 400, "Bad Request",
-					            "<html><body>Bad request</body></html>", 37);
-			} else {
-				sid = upnpevents_addSubscriber(path, h->req_Callback,
-				                               h->req_CallbackLen, h->req_Timeout);
-				h->respflags = FLAG_TIMEOUT;
-				if(sid) {
-					DPRINTF(E_DEBUG, L_HTTP, "generated sid=%s\n", sid);
-					h->respflags |= FLAG_SID;
-					h->req_SID = sid;
-					h->req_SIDLen = strlen(sid);
-				}
-				BuildResp_upnphttp(h, 0, 0);
-			}
-		} else {
-			/* subscription renew */
-			/* Invalid SID
-412 Precondition Failed. If a SID does not correspond to a known,
-un-expired subscription, the publisher must respond
-with HTTP error 412 Precondition Failed. */
-			if((renewSubscription(h->req_SID, h->req_SIDLen, h->req_Timeout) < 0) ||
-				  (h->req_NT && strncmp(h->req_NT, "upnp:event", h->req_NTLen)==0)) {
-//			if(1) {
-				BuildResp2_upnphttp(h, 400, "Precondition Failed", 0, 0);
-			} else {
-				/* A DLNA device must enforce a 5 minute timeout */
-				h->respflags = FLAG_TIMEOUT;
-				h->req_Timeout = 300;
-				h->respflags |= FLAG_SID;
-				BuildResp_upnphttp(h, 0, 0);
-			}
+
+	type = check_event(h);
+	if (type == E_SUBSCRIBE)
+	{
+		/* - add to the subscriber list
+		 * - respond HTTP/x.x 200 OK 
+		 * - Send the initial event message */
+		/* Server:, SID:; Timeout: Second-(xx|infinite) */
+		sid = upnpevents_addSubscriber(path, h->req_Callback,
+		                               h->req_CallbackLen, h->req_Timeout);
+		h->respflags = FLAG_TIMEOUT;
+		if (sid)
+		{
+			DPRINTF(E_DEBUG, L_HTTP, "generated sid=%s\n", sid);
+			h->respflags |= FLAG_SID;
+			h->req_SID = sid;
+			h->req_SIDLen = strlen(sid);
 		}
-		SendResp_upnphttp(h);
-		CloseSocket_upnphttp(h);
+		BuildResp_upnphttp(h, 0, 0);
 	}
+	else if (type == E_RENEW)
+	{
+		/* subscription renew */
+		if (renewSubscription(h->req_SID, h->req_SIDLen, h->req_Timeout) < 0)
+		{
+			/* Invalid SID
+			   412 Precondition Failed. If a SID does not correspond to a known,
+			   un-expired subscription, the publisher must respond
+			   with HTTP error 412 Precondition Failed. */
+			BuildResp2_upnphttp(h, 412, "Precondition Failed", 0, 0);
+		}
+		else
+		{
+			/* A DLNA device must enforce a 5 minute timeout */
+			h->respflags = FLAG_TIMEOUT;
+			h->req_Timeout = 300;
+			h->respflags |= FLAG_SID;
+			BuildResp_upnphttp(h, 0, 0);
+		}
+	}
+	SendResp_upnphttp(h);
+	CloseSocket_upnphttp(h);
 }
 
 static void
@@ -1470,7 +1424,6 @@ SendResp_albumArt(struct upnphttp * h, char * object)
 {
 	char header[512];
 	char *path;
-	char *dash;
 	char date[30];
 	time_t curtime = time(NULL);
 	off_t size;
@@ -1575,7 +1528,7 @@ SendResp_caption(struct upnphttp * h, char * object)
 	{
  		if( h->req_command != EHead )
 			send_file(h, fd, 0, size-1);
-	}	
+	}
 	close(fd);
 	CloseSocket_upnphttp(h);
 }
@@ -1629,7 +1582,6 @@ SendResp_thumbnail(struct upnphttp * h, char * object)
 			exif_data_unref(ed);
 		return;
 	}
-
 	strftime(date, 30,"%a, %d %b %Y %H:%M:%S GMT" , gmtime(&curtime));
 	ret = snprintf(header, sizeof(header), "HTTP/1.1 200 OK\r\n"
 	                                       "Content-Type: image/jpeg\r\n"
@@ -1638,8 +1590,7 @@ SendResp_thumbnail(struct upnphttp * h, char * object)
 	                                       "Date: %s\r\n"
 	                                       "EXT:\r\n"
 	                                       "realTimeInfo.dlna.org: DLNA.ORG_TLAG=*\r\n"
-//	                                       "contentFeatures.dlna.org: DLNA.ORG_PN=JPEG_TN;DLNA.ORG_CI=1\r\n"
-	                                       "contentFeatures.dlna.org: DLNA.ORG_PN=JPEG_TN\r\n"
+	                                       "contentFeatures.dlna.org: DLNA.ORG_PN=JPEG_TN;DLNA.ORG_CI=1\r\n"
 	                                       "Server: " MINIDLNA_SERVER_STRING "\r\n"
 	                                       "transferMode.dlna.org: Interactive\r\n\r\n",
 	                                       (intmax_t)ed->size, date);
@@ -1662,8 +1613,7 @@ SendResp_resizedimg(struct upnphttp * h, char * object)
 	char **result;
 	char date[30];
 	char dlna_pn[22];
-//	uint32_t dlna_flags = DLNA_FLAG_DLNA_V1_5|DLNA_FLAG_HTTP_STALLING|DLNA_FLAG_TM_B|DLNA_FLAG_TM_I;
-	uint32_t dlna_flags = DLNA_FLAG_DLNA_V1_5|DLNA_FLAG_TM_B|DLNA_FLAG_TM_I;
+	uint32_t dlna_flags = DLNA_FLAG_DLNA_V1_5|DLNA_FLAG_HTTP_STALLING|DLNA_FLAG_TM_B|DLNA_FLAG_TM_I;
 	time_t curtime = time(NULL);
 	int width=640, height=480, dstw, dsth, size;
 	int srcw, srch;
@@ -1784,17 +1734,13 @@ SendResp_resizedimg(struct upnphttp * h, char * object)
 		dsth = height;
 		dstw = (((height<<10)/srch) * srcw>>10);
 	}
-	if( dstw <= 160 && dsth <= 160 )
-		strcpy(dlna_pn, "DLNA.ORG_PN=JPEG_TN");
-	else if( dstw <= 640 && dsth <= 480 )
-//		strcpy(dlna_pn, "DLNA.ORG_PN=JPEG_SM;");
-		strcpy(dlna_pn, "DLNA.ORG_PN=JPEG_SM");
+
+	if( dstw <= 640 && dsth <= 480 )
+		strcpy(dlna_pn, "DLNA.ORG_PN=JPEG_SM;");
 	else if( dstw <= 1024 && dsth <= 768 )
-//		strcpy(dlna_pn, "DLNA.ORG_PN=JPEG_MED;");
-		strcpy(dlna_pn, "DLNA.ORG_PN=JPEG_MED");
+		strcpy(dlna_pn, "DLNA.ORG_PN=JPEG_MED;");
 	else
-//		strcpy(dlna_pn, "DLNA.ORG_PN=JPEG_LRG;");
-		strcpy(dlna_pn, "DLNA.ORG_PN=JPEG_LRG");
+		strcpy(dlna_pn, "DLNA.ORG_PN=JPEG_LRG;");
 
 	if( srcw>>4 >= dstw && srch>>4 >= dsth)
 		scale = 8;
@@ -1807,7 +1753,6 @@ SendResp_resizedimg(struct upnphttp * h, char * object)
         str.size = sizeof(header);
         str.off = 0;
 
-
 	strftime(date, 30,"%a, %d %b %Y %H:%M:%S GMT" , gmtime(&curtime));
 	strcatf(&str, "HTTP/1.1 200 OK\r\n"
 	              "Content-Type: image/jpeg\r\n"
@@ -1815,14 +1760,11 @@ SendResp_resizedimg(struct upnphttp * h, char * object)
 	              "Date: %s\r\n"
 	              "EXT:\r\n"
 	              "realTimeInfo.dlna.org: DLNA.ORG_TLAG=*\r\n"
-//	              "contentFeatures.dlna.org: %sDLNA.ORG_CI=%X;DLNA.ORG_FLAGS=%08X%024X\r\n"
-	              "contentFeatures.dlna.org: %s\r\n"
+	              "contentFeatures.dlna.org: %sDLNA.ORG_CI=%X;DLNA.ORG_FLAGS=%08X%024X\r\n"
 	              "Server: " MINIDLNA_SERVER_STRING "\r\n",
-//	              date, dlna_pn, 1, dlna_flags, 0);
-	              date, dlna_pn);
+	              date, dlna_pn, 1, dlna_flags, 0);
 #if USE_FORK
 	if( (h->reqflags & FLAG_XFERBACKGROUND) && (setpriority(PRIO_PROCESS, 0, 19) == 0) )
-//	if( (h->reqflags & FLAG_XFERBACKGROUND))
 		strcatf(&str, "transferMode.dlna.org: Background\r\n");
 	else
 #endif
@@ -1905,8 +1847,7 @@ SendResp_dlnafile(struct upnphttp * h, char * object)
 	off_t total, offset, size;
 	sqlite_int64 id;
 	int sendfh;
-//	uint32_t dlna_flags = DLNA_FLAG_DLNA_V1_5|DLNA_FLAG_HTTP_STALLING|DLNA_FLAG_TM_B;
-	uint32_t dlna_flags = DLNA_FLAG_DLNA_V1_5|DLNA_FLAG_TM_B;
+	uint32_t dlna_flags = DLNA_FLAG_DLNA_V1_5|DLNA_FLAG_HTTP_STALLING|DLNA_FLAG_TM_B;
 	static struct { sqlite_int64 id;
 	                enum client_types client;
 	                char path[PATH_MAX];
@@ -2073,7 +2014,6 @@ SendResp_dlnafile(struct upnphttp * h, char * object)
 
 #if USE_FORK
 	if( (h->reqflags & FLAG_XFERBACKGROUND) && (setpriority(PRIO_PROCESS, 0, 19) == 0) )
-//	if( (h->reqflags & FLAG_XFERBACKGROUND))
 		strcatf(&str, "transferMode.dlna.org: Background\r\n");
 	else
 #endif
@@ -2107,11 +2047,9 @@ SendResp_dlnafile(struct upnphttp * h, char * object)
 	              "Date: %s\r\n"
 	              "EXT:\r\n"
 	              "realTimeInfo.dlna.org: DLNA.ORG_TLAG=*\r\n"
-//	              "contentFeatures.dlna.org: %sDLNA.ORG_OP=%02X;DLNA.ORG_CI=%X;DLNA.ORG_FLAGS=%08X%024X\r\n"
-	              "contentFeatures.dlna.org: %sDLNA.ORG_OP=%02X\r\n"
+	              "contentFeatures.dlna.org: %sDLNA.ORG_OP=%02X;DLNA.ORG_CI=%X;DLNA.ORG_FLAGS=%08X%024X\r\n"
 	              "Server: " MINIDLNA_SERVER_STRING "\r\n\r\n",
-//	              date, last_file.dlna, 1, 0, dlna_flags, 0);
-	              date, last_file.dlna, 1);
+	              date, last_file.dlna, 1, 0, dlna_flags, 0);
 
 	//DEBUG DPRINTF(E_DEBUG, L_HTTP, "RESPONSE: %s\n", str.data);
 	if( send_data(h, str.data, str.off, MSG_MORE) == 0 )
