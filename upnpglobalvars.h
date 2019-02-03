@@ -52,11 +52,12 @@
 #include <time.h>
 
 #include "minidlnatypes.h"
+#include "clients.h"
 #include "config.h"
 
 #include <sqlite3.h>
 
-#define MINIDLNA_VERSION "1.0.26"
+#define MINIDLNA_VERSION "1.1.5"
 
 #ifdef NETGEAR
 # define SERVER_NAME "ReadyDLNA"
@@ -64,61 +65,20 @@
 # define SERVER_NAME "MiniDLNA"
 #endif
 
-#define CLIENT_CACHE_SLOTS 20
 #define USE_FORK 1
-#define DB_VERSION 8
+#define DB_VERSION 9
 
 #ifdef ENABLE_NLS
 #define _(string) gettext(string)
 #else
 #define _(string) (string)
 #endif
+#define THISORNUL(s) (s ? s : "")
 
 #ifndef PNPX
 #define PNPX 0
 #endif
 
-#if 1
-#define RESOURCE_PROTOCOL_INFO_VALUES \
-	"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_TN;DLNA.ORG_OP=01," \
-	"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_SM;DLNA.ORG_OP=01," \
-	"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_MED;DLNA.ORG_OP=01," \
-	"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_LRG;DLNA.ORG_OP=01," \
-	"http-get:*:video/mpeg:DLNA.ORG_PN=MPEG_PS_NTSC;DLNA.ORG_OP=01," \
-	"http-get:*:video/mpeg:DLNA.ORG_PN=MPEG_PS_PAL;DLNA.ORG_OP=01," \
-	"http-get:*:video/mpeg:DLNA.ORG_PN=MPEG_TS_HD_NA_ISO;DLNA.ORG_OP=01," \
-	"http-get:*:video/mpeg:DLNA.ORG_PN=MPEG_TS_SD_NA_ISO;DLNA.ORG_OP=01," \
-	"http-get:*:video/vnd.dlna.mpeg-tts:DLNA.ORG_PN=MPEG_TS_HD_NA;DLNA.ORG_OP=01," \
-	"http-get:*:video/x-ms-wmv:DLNA.ORG_PN=WMVSPML_BASE;DLNA.ORG_OP=01," \
-	"http-get:*:video/x-ms-wmv:DLNA.ORG_PN=WMVMED_BASE;DLNA.ORG_OP=01," \
-	"http-get:*:video/x-ms-wmv:DLNA.ORG_PN=WMVMED_FULL;DLNA.ORG_OP=01," \
-	"http-get:*:video/x-ms-wmv:DLNA.ORG_PN=WMVHIGH_FULL;DLNA.ORG_OP=01," \
-	"http-get:*:video/x-ms-wmv:DLNA.ORG_PN=WMVMED_PRO;DLNA.ORG_OP=01," \
-	"http-get:*:video/x-ms-wmv:DLNA.ORG_PN=WMVHIGH_PRO;DLNA.ORG_OP=01," \
-	"http-get:*:audio/mpeg:DLNA.ORG_PN=MP3;DLNA.ORG_OP=01," \
-	"http-get:*:audio/x-ms-wma:DLNA.ORG_PN=WMABASE;DLNA.ORG_OP=01," \
-	"http-get:*:audio/x-ms-wma:DLNA.ORG_PN=WMAFULL;DLNA.ORG_OP=01," \
-	"http-get:*:audio/x-ms-wma:DLNA.ORG_PN=WMAPRO;DLNA.ORG_OP=01," \
-	"http-get:*:audio/mp4:DLNA.ORG_PN=AAC_ISO_320;DLNA.ORG_OP=01," \
-	"http-get:*:audio/3gpp:DLNA.ORG_PN=AAC_ISO_320;DLNA.ORG_OP=01," \
-	"http-get:*:video/vnd.dlna.mpeg-tts:DLNA.ORG_PN=MPEG_TS_HD_NA_T;DLNA.ORG_OP=01," \
-	"http-get:*:audio/L16;rate=44100;channels=2:DLNA.ORG_PN=LPCM;DLNA.ORG_OP=01," \
-	"http-get:*:image/jpeg:*," \
-	"http-get:*:video/avi:*," \
-	"http-get:*:video/divx:*," \
-	"http-get:*:video/x-matroska:*," \
-	"http-get:*:video/mpeg:*," \
-	"http-get:*:video/mp4:*," \
-	"http-get:*:video/x-ms-wmv:*," \
-	"http-get:*:video/x-msvideo:*," \
-	"http-get:*:video/x-flv:*," \
-	"http-get:*:video/x-tivo-mpeg:*," \
-	"http-get:*:video/quicktime:*," \
-	"http-get:*:audio/mp4:*," \
-	"http-get:*:audio/x-wav:*," \
-	"http-get:*:audio/x-flac:*," \
-	"http-get:*:application/ogg:*"
-#else
 #define RESOURCE_PROTOCOL_INFO_VALUES \
 	"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_TN," \
 	"http-get:*:image/jpeg:DLNA.ORG_PN=JPEG_SM," \
@@ -210,7 +170,6 @@
 	"http-get:*:audio/x-wav:*," \
 	"http-get:*:audio/x-flac:*," \
 	"http-get:*:application/ogg:*"
-#endif
 
 #define DLNA_FLAG_DLNA_V1_5      0x00100000
 #define DLNA_FLAG_HTTP_STALLING  0x00200000
@@ -230,25 +189,27 @@ extern uint32_t runtime_flags;
 #define TIVO_MASK             0x0002
 #define DLNA_STRICT_MASK      0x0004
 #define NO_PLAYLIST_MASK      0x0008
+#define SYSTEMD_MASK          0x0010
+#define MERGE_MEDIA_DIRS_MASK 0x0020
 
 #define SETFLAG(mask)	runtime_flags |= mask
-#define GETFLAG(mask)	runtime_flags & mask
+#define GETFLAG(mask)	(runtime_flags & mask)
 #define CLEARFLAG(mask)	runtime_flags &= ~mask
 
-extern const char * pidfilename;
+extern const char *pidfilename;
 
 extern char uuidvalue[];
 
-#define MODELNAME_MAX_LEN (64)
+#define MODELNAME_MAX_LEN 64
 extern char modelname[];
 
-#define MODELNUMBER_MAX_LEN (16)
+#define MODELNUMBER_MAX_LEN 16
 extern char modelnumber[];
 
-#define SERIALNUMBER_MAX_LEN (16)
+#define SERIALNUMBER_MAX_LEN 16
 extern char serialnumber[];
 
-#define PRESENTATIONURL_MAX_LEN (64)
+#define PRESENTATIONURL_MAX_LEN 64
 extern char presentationurl[];
 
 #if PNPX
@@ -256,25 +217,23 @@ extern char pnpx_hwid[];
 #endif
 
 /* lan addresses */
-/* MAX_LAN_ADDR : maximum number of interfaces
- * to listen to SSDP traffic */
-#define MAX_LAN_ADDR (4)
 extern int n_lan_addr;
 extern struct lan_addr_s lan_addr[];
+extern int sssdp;
 
-extern const char * minissdpdsocketpath;
+extern const char *minissdpdsocketpath;
 
 /* UPnP-A/V [DLNA] */
 extern sqlite3 *db;
-#define FRIENDLYNAME_MAX_LEN (64)
+#define FRIENDLYNAME_MAX_LEN 64
 extern char friendly_name[];
 extern char db_path[];
 extern char log_path[];
-extern struct media_dir_s * media_dirs;
-extern struct album_art_name_s * album_art_names;
-extern struct client_cache_s clients[CLIENT_CACHE_SLOTS];
+extern struct media_dir_s *media_dirs;
+extern struct album_art_name_s *album_art_names;
 extern short int scanning;
 extern volatile short int quitting;
 extern volatile uint32_t updateID;
+extern const char *force_sort_criteria;
 
 #endif

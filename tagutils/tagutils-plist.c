@@ -24,10 +24,8 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "misc.h"
 #include "tagutils.h"
-#include "textutils.h"
-#include "../../ffmpeg-2.3.4/libavutil/log.h"
+#include "log.h"
 
 
 #define MAX_BUF 4096
