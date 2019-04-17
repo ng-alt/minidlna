@@ -17,6 +17,7 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
+#include "config.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -24,13 +25,14 @@
 #include <string.h>
 #include <time.h>
 
+#include "upnpglobalvars.h"
 #include "log.h"
 
 static FILE *log_fp = NULL;
-static int default_log_level = E_WARN;
+static const int _default_log_level = E_WARN;
 int log_level[L_MAX];
 
-char *facility_name[] = {
+const char *facility_name[] = {
 	"general",
 	"artwork",
 	"database",
@@ -43,70 +45,76 @@ char *facility_name[] = {
 	0
 };
 
-char *level_name[] = {
+const char *level_name[] = {
 	"off",					// E_OFF
 	"fatal",				// E_FATAL
 	"error",				// E_ERROR
 	"warn",					// E_WARN
 	"info",					// E_INFO
 	"debug",				// E_DEBUG
+	"maxdebug",				// E_MAXDEBUG
 	0
 };
+
+void
+log_close(void)
+{
+	if (log_fp)
+		fclose(log_fp);
+}
+
+int find_matching_name(const char* str, const char* names[]) {
+	if (str == NULL) return -1;
+
+	const char* start = strpbrk(str, ",=");
+	int level, c = (start != NULL) ? start - str : strlen(str);
+	for (level = 0; names[level] != 0; level++) {
+		if (!(strncasecmp(names[level], str, c)))
+			return level;
+	}
+	return -1;
+}
 
 int
 log_init(const char *fname, const char *debug)
 {
 	int i;
 	FILE *fp;
-	short int log_level_set[L_MAX];
+
+	int level = find_matching_name(debug, level_name);
+	int default_log_level = (level == -1) ? _default_log_level : level;
+
+	for (i=0; i<L_MAX; i++)
+		log_level[i] = default_log_level;
 
 	if (debug)
 	{
-		const char *rhs, *lhs, *nlhs, *p;
-		int n;
+		const char *rhs, *lhs, *nlhs;
 		int level, facility;
-		memset(&log_level_set, 0, sizeof(log_level_set));
+
 		rhs = nlhs = debug;
 		while (rhs && (rhs = strchr(rhs, '='))) {
 			rhs++;
-			p = strchr(rhs, ',');
-			n = p ? p - rhs : strlen(rhs);
-			for (level=0; level_name[level]; level++) {
-				if (!(strncasecmp(level_name[level], rhs, n)))
-					break;
-			}
-			lhs = nlhs;
-			rhs = nlhs = p;
-			if (!(level_name[level])) {
-				// unknown level
+			level = find_matching_name(rhs, level_name);
+			if (level == -1) {
+				DPRINTF(E_WARN, L_GENERAL, "unknown level in debug string: %s", debug);
 				continue;
 			}
+
+			lhs = nlhs;
+			rhs = nlhs = strchr(rhs, ',');
 			do {
 				if (*lhs==',') lhs++;
-				p = strpbrk(lhs, ",=");
-				n = p ? p - lhs : strlen(lhs);
-				for (facility=0; facility_name[facility]; facility++) {
-					if (!(strncasecmp(facility_name[facility], lhs, n)))
-						break;
-				}
-				if ((facility_name[facility])) {
+				facility = find_matching_name(lhs, facility_name);
+				if (facility == -1) {
+					DPRINTF(E_WARN, L_GENERAL, "unknown debug facility in debug string: %s", debug);
+				} else {
 					log_level[facility] = level;
-					log_level_set[facility] = 1;
 				}
-				lhs = p;
+
+				lhs = strpbrk(lhs, ",=");
 			} while (*lhs && *lhs==',');
 		}
-		for (i=0; i<L_MAX; i++)
-		{
-			if( !log_level_set[i] )
-			{
-				log_level[i] = default_log_level;
-			}
-		}
-	}
-	else {
-		for (i=0; i<L_MAX; i++)
-			log_level[i] = default_log_level;
 	}
 
 	if (!fname)					// use default i.e. stdout
@@ -121,11 +129,7 @@ log_init(const char *fname, const char *debug)
 void
 log_err(int level, enum _log_facility facility, char *fname, int lineno, char *fmt, ...)
 {
-	//char errbuf[1024];
-	char * errbuf;
 	va_list ap;
-	time_t t;
-	struct tm *tm;
 
 	if (level && level>log_level[facility] && level>E_FATAL)
 		return;
@@ -133,29 +137,33 @@ log_err(int level, enum _log_facility facility, char *fname, int lineno, char *f
 	if (!log_fp)
 		log_fp = stdout;
 
+	// timestamp
+	if (!GETFLAG(SYSTEMD_MASK))
+	{
+		time_t t;
+		struct tm *tm;
+		t = time(NULL);
+		tm = localtime(&t);
+		fprintf(log_fp, "[%04d/%02d/%02d %02d:%02d:%02d] ",
+		        tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday,
+		        tm->tm_hour, tm->tm_min, tm->tm_sec);
+	}
+
+	if (level)
+		fprintf(log_fp, "%s:%d: %s: ", fname, lineno, level_name[level]);
+	else
+		fprintf(log_fp, "%s:%d: ", fname, lineno);
+
 	// user log
 	va_start(ap, fmt);
-	//vsnprintf(errbuf, sizeof(errbuf), fmt, ap);
-	if (vasprintf(&errbuf, fmt, ap) == -1)
+	if (vfprintf(log_fp, fmt, ap) == -1)
 	{
 		va_end(ap);
 		return;
 	}
 	va_end(ap);
 
-	// timestamp
-	t = time(NULL);
-	tm = localtime(&t);
-	fprintf(log_fp, "[%04d/%02d/%02d %02d:%02d:%02d] ",
-	        tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday,
-	        tm->tm_hour, tm->tm_min, tm->tm_sec);
-
-	if (level)
-		fprintf(log_fp, "%s:%d: %s: %s", fname, lineno, level_name[level], errbuf);
-	else
-		fprintf(log_fp, "%s:%d: %s", fname, lineno, errbuf);
 	fflush(log_fp);
-	free(errbuf);
 
 	if (level==E_FATAL)
 		exit(-1);
