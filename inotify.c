@@ -32,11 +32,7 @@
 #include <sys/resource.h>
 #include <poll.h>
 #include <sys/inotify.h>
-/* Foxconn added start Bernie 06/01/2016 */
-#include "../ffmpeg-2.3.4/libavutil/avutil.h"
-#include "../ffmpeg-2.3.4/libavcodec/avcodec.h"
-#include "../ffmpeg-2.3.4/libavformat/avformat.h"
-/* Foxconn added end Bernie 06/01/2016 */
+#include <libav.h>
 
 #include "upnpglobalvars.h"
 #include "inotify.h"
